@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { NavLink, Outlet, Link } from 'react-router-dom';
 import {
-  LayoutDashboard, Package, ShoppingCart, Users, Tags,
-  Menu, X, Store, LogOut
+  LayoutDashboard, Package, ShoppingCart, Users, Tags, Ticket,
+  Menu, X, LogOut
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 
@@ -12,6 +12,7 @@ const navItems = [
   { to: '/quan-ly/don-hang', label: 'Đơn hàng', icon: ShoppingCart },
   { to: '/quan-ly/nguoi-dung', label: 'Khách hàng', icon: Users },
   { to: '/quan-ly/thuoc-tinh', label: 'Thuộc tính', icon: Tags },
+  { to: '/quan-ly/voucher', label: 'Voucher', icon: Ticket },
 ];
 
 export default function AdminLayout() {
@@ -55,10 +56,6 @@ export default function AdminLayout() {
 
         {/* Bottom */}
         <div className="p-3 border-t border-gray-700 space-y-1">
-          <Link to="/" className={`flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors text-sm`}>
-            <Store className="w-5 h-5 flex-shrink-0" />
-            {!collapsed && <span>Cửa hàng</span>}
-          </Link>
           <button onClick={logout} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-red-400 hover:bg-gray-800 transition-colors text-sm">
             <LogOut className="w-5 h-5 flex-shrink-0" />
             {!collapsed && <span>Đăng xuất</span>}

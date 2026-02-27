@@ -1,11 +1,22 @@
 import { useState, useEffect } from 'react';
 import { User, MapPin, Lock, Plus, Edit2, Trash2, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { taiKhoanApi } from '../services/api';
+import { taiKhoanApi, diaChiApi } from '../services/api';
 import type { DiaChi, User as UserType } from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 
 type Tab = 'profile' | 'addresses' | 'password';
+
+// Validation helpers
+const isValidPhoneNumber = (phone: string): boolean => {
+  if (!phone) return true; // optional
+  return /^(\+84|0)[0-9]{9,10}$/.test(phone.replace(/\s/g, ''));
+};
+
+const isValidEmail = (email: string): boolean => {
+  if (!email) return true; // optional
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+};
 
 export default function TaiKhoanPage() {
   const [activeTab, setActiveTab] = useState<Tab>('profile');
@@ -21,7 +32,7 @@ export default function TaiKhoanPage() {
     <div className="max-w-5xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Tài khoản của tôi</h1>
       <div className="flex gap-6">
-        <div className="w-48 flex-shrink-0">
+        <div className="w-48 shrink-0">
           <nav className="space-y-1">
             {tabs.map(t => (
               <button key={t.id} onClick={() => setActiveTab(t.id)}
@@ -62,6 +73,21 @@ function ProfileTab({ setAuth }: { user: UserType | null; setAuth: (token: strin
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Validate email if provided
+    if (form.email && !isValidEmail(form.email)) {
+      toast.error('Email không hợp lệ');
+      return;
+    }
+    // Validate phone if provided
+    if (form.soDienThoai && !isValidPhoneNumber(form.soDienThoai)) {
+      toast.error('Số điện thoại không hợp lệ (10-11 chữ số)');
+      return;
+    }
+    // Validate name
+    if (form.hoTen.trim().length < 3) {
+      toast.error('Họ tên phải có ít nhất 3 ký tự');
+      return;
+    }
     setSaving(true);
     try {
       const r = await taiKhoanApi.capNhatThongTin(form);
@@ -83,15 +109,24 @@ function ProfileTab({ setAuth }: { user: UserType | null; setAuth: (token: strin
       <form onSubmit={save} className="space-y-4 max-w-lg">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Họ tên</label>
-          <input className="input-field" value={form.hoTen} onChange={e => setForm({ ...form, hoTen: e.target.value })} required />
+          <input className={`input-field ${form.hoTen && form.hoTen.trim().length < 3 ? 'border-red-400' : ''}`} value={form.hoTen} onChange={e => setForm({ ...form, hoTen: e.target.value })} required />
+          {form.hoTen && form.hoTen.trim().length < 3 && (
+            <p className="text-xs text-red-500 mt-1">Ít nhất 3 ký tự</p>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-          <input className="input-field" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+          <input className={`input-field ${form.email && !isValidEmail(form.email) ? 'border-red-400' : ''}`} type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+          {form.email && !isValidEmail(form.email) && (
+            <p className="text-xs text-red-500 mt-1">Email không hợp lệ</p>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Số điện thoại</label>
-          <input className="input-field" value={form.soDienThoai} onChange={e => setForm({ ...form, soDienThoai: e.target.value })} />
+          <input className={`input-field ${form.soDienThoai && !isValidPhoneNumber(form.soDienThoai) ? 'border-red-400' : ''}`} value={form.soDienThoai} onChange={e => setForm({ ...form, soDienThoai: e.target.value })} />
+          {form.soDienThoai && !isValidPhoneNumber(form.soDienThoai) && (
+            <p className="text-xs text-red-500 mt-1">Số điện thoại không hợp lệ (10-11 chữ số)</p>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Ngày sinh</label>
@@ -191,21 +226,99 @@ function AddressForm({ initial, onSave, onCancel }: { initial: DiaChi | null; on
     hoTen: initial?.hoTen || '',
     soDienThoai: initial?.soDienThoai || '',
     tinhThanh: initial?.tinhThanh || '',
+    maTinhGHN: initial?.maTinhGHN || 0,
     quanHuyen: initial?.quanHuyen || '',
+    maHuyenGHN: initial?.maHuyenGHN || 0,
     phuongXa: initial?.phuongXa || '',
+    maXaGHN: initial?.maXaGHN || '',
     diaChiDong1: initial?.diaChiDong1 || '',
     laMacDinh: initial?.laMacDinh || false,
   });
   const [saving, setSaving] = useState(false);
+  const [provinceList, setProvinceList] = useState<{ ProvinceID: number; ProvinceName: string }[]>([]);
+  const [districtList, setDistrictList] = useState<{ DistrictID: number; DistrictName: string }[]>([]);
+  const [wardList, setWardList] = useState<{ WardCode: string; WardName: string }[]>([]);
+  const [loadingGHN, setLoadingGHN] = useState(false);
+
+  useEffect(() => {
+    diaChiApi.layDanhSachTinh()
+      .then(r => setProvinceList(r.data.duLieu || []))
+      .catch(err => console.error('Lỗi load tỉnh:', err));
+  }, []);
+
+  useEffect(() => {
+    if (!form.maTinhGHN) {
+      setDistrictList([]);
+      setWardList([]);
+      return;
+    }
+    setLoadingGHN(true);
+    diaChiApi.layDanhSachHuyen(form.maTinhGHN)
+      .then(r => {
+        setDistrictList(r.data.duLieu || []);
+        setWardList([]);
+        setForm(prev => ({ ...prev, maHuyenGHN: 0, phuongXa: '', maXaGHN: '' }));
+      })
+      .catch(err => console.error('Lỗi load huyện:', err))
+      .finally(() => setLoadingGHN(false));
+  }, [form.maTinhGHN]);
+
+  useEffect(() => {
+    if (!form.maHuyenGHN) {
+      setWardList([]);
+      return;
+    }
+    setLoadingGHN(true);
+    diaChiApi.layDanhSachXa(form.maHuyenGHN)
+      .then(r => {
+        setWardList(r.data.duLieu || []);
+        setForm(prev => ({ ...prev, phuongXa: '', maXaGHN: '' }));
+      })
+      .catch(err => console.error('Lỗi load xã:', err))
+      .finally(() => setLoadingGHN(false));
+  }, [form.maHuyenGHN]);
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Validate name
+    if (form.hoTen.trim().length < 3) {
+      toast.error('Tên người nhận phải có ít nhất 3 ký tự');
+      return;
+    }
+    // Validate phone
+    if (!isValidPhoneNumber(form.soDienThoai)) {
+      toast.error('Số điện thoại không hợp lệ (10-11 chữ số)');
+      return;
+    }
+    // Validate address fields
+    if (!form.maTinhGHN || !form.maHuyenGHN || !form.maXaGHN) {
+      toast.error('Vui lòng chọn đầy đủ Tỉnh/Thành, Quận/Huyện, Phường/Xã');
+      return;
+    }
+    if (form.diaChiDong1.trim().length < 5) {
+      toast.error('Địa chỉ cụ thể phải có ít nhất 5 ký tự');
+      return;
+    }
     setSaving(true);
     try {
+      const province = provinceList.find(p => p.ProvinceID === form.maTinhGHN);
+      const district = districtList.find(d => d.DistrictID === form.maHuyenGHN);
+      const ward = wardList.find(w => w.WardCode === form.maXaGHN);
+
+      const payload = {
+        ...form,
+        hoTen: form.hoTen.trim(),
+        soDienThoai: form.soDienThoai.replace(/\s/g, ''),
+        diaChiDong1: form.diaChiDong1.trim(),
+        tinhThanh: province?.ProvinceName || form.tinhThanh,
+        quanHuyen: district?.DistrictName || form.quanHuyen,
+        phuongXa: ward?.WardName || form.phuongXa,
+      };
+
       if (initial?.id) {
-        await taiKhoanApi.capNhatDiaChi(initial.id, form);
+        await taiKhoanApi.capNhatDiaChi(initial.id, payload);
       } else {
-        await taiKhoanApi.themDiaChi(form as DiaChi);
+        await taiKhoanApi.themDiaChi(payload as DiaChi);
       }
       toast.success(initial ? 'Đã cập nhật địa chỉ' : 'Đã thêm địa chỉ');
       onSave();
@@ -221,28 +334,61 @@ function AddressForm({ initial, onSave, onCancel }: { initial: DiaChi | null; on
       <h3 className="font-medium text-gray-900 mb-4">{initial ? 'Sửa địa chỉ' : 'Thêm địa chỉ mới'}</h3>
       <form onSubmit={save} className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Tên người nhận</label>
-          <input className="input-field text-sm" required value={form.hoTen} onChange={e => setForm({ ...form, hoTen: e.target.value })} />
+          <label className="block text-xs font-medium text-gray-500 mb-1">
+            Tên người nhận
+            {form.hoTen && form.hoTen.trim().length < 3 && (
+              <span className="text-red-500 ml-1">*</span>
+            )}
+          </label>
+          <input className={`input-field text-sm ${form.hoTen && form.hoTen.trim().length < 3 ? 'border-red-400' : ''}`} required value={form.hoTen} onChange={e => setForm({ ...form, hoTen: e.target.value })} />
+          {form.hoTen && form.hoTen.trim().length < 3 && (
+            <p className="text-xs text-red-500 mt-0.5">Ít nhất 3 ký tự</p>
+          )}
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Số điện thoại</label>
-          <input className="input-field text-sm" required value={form.soDienThoai} onChange={e => setForm({ ...form, soDienThoai: e.target.value })} />
+          <label className="block text-xs font-medium text-gray-500 mb-1">
+            Số điện thoại
+            {form.soDienThoai && !isValidPhoneNumber(form.soDienThoai) && (
+              <span className="text-red-500 ml-1">*</span>
+            )}
+          </label>
+          <input className={`input-field text-sm ${form.soDienThoai && !isValidPhoneNumber(form.soDienThoai) ? 'border-red-400' : ''}`} required value={form.soDienThoai} onChange={e => setForm({ ...form, soDienThoai: e.target.value })} />
+          {form.soDienThoai && !isValidPhoneNumber(form.soDienThoai) && (
+            <p className="text-xs text-red-500 mt-0.5">10-11 chữ số</p>
+          )}
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Tỉnh/Thành phố</label>
-          <input className="input-field text-sm" required value={form.tinhThanh} onChange={e => setForm({ ...form, tinhThanh: e.target.value })} />
+          <label className="block text-xs font-medium text-gray-500 mb-1">Tỉnh/Thành phố *</label>
+          <select className="input-field text-sm" required value={form.maTinhGHN} onChange={e => setForm({ ...form, maTinhGHN: Number(e.target.value) })}>
+            <option value={0}>-- Chọn Tỉnh/Thành phố --</option>
+            {provinceList.map(p => (<option key={p.ProvinceID} value={p.ProvinceID}>{p.ProvinceName}</option>))}
+          </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Quận/Huyện</label>
-          <input className="input-field text-sm" required value={form.quanHuyen} onChange={e => setForm({ ...form, quanHuyen: e.target.value })} />
+          <label className="block text-xs font-medium text-gray-500 mb-1">Quận/Huyện *</label>
+          <select className="input-field text-sm" required value={form.maHuyenGHN} onChange={e => setForm({ ...form, maHuyenGHN: Number(e.target.value) })} disabled={!form.maTinhGHN || loadingGHN}>
+            <option value={0}>-- Chọn Quận/Huyện --</option>
+            {districtList.map(d => (<option key={d.DistrictID} value={d.DistrictID}>{d.DistrictName}</option>))}
+          </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Phường/Xã</label>
-          <input className="input-field text-sm" required value={form.phuongXa} onChange={e => setForm({ ...form, phuongXa: e.target.value })} />
+          <label className="block text-xs font-medium text-gray-500 mb-1">Phường/Xã *</label>
+          <select className="input-field text-sm" required value={form.maXaGHN} onChange={e => setForm({ ...form, maXaGHN: e.target.value })} disabled={!form.maHuyenGHN || loadingGHN}>
+            <option value="">-- Chọn Phường/Xã --</option>
+            {wardList.map(w => (<option key={w.WardCode} value={w.WardCode}>{w.WardName}</option>))}
+          </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Địa chỉ cụ thể</label>
-          <input className="input-field text-sm" required value={form.diaChiDong1} onChange={e => setForm({ ...form, diaChiDong1: e.target.value })} />
+          <label className="block text-xs font-medium text-gray-500 mb-1">
+            Địa chỉ cụ thể
+            {form.diaChiDong1 && form.diaChiDong1.trim().length < 5 && (
+              <span className="text-red-500 ml-1">*</span>
+            )}
+          </label>
+          <input className={`input-field text-sm ${form.diaChiDong1 && form.diaChiDong1.trim().length < 5 ? 'border-red-400' : ''}`} required value={form.diaChiDong1} onChange={e => setForm({ ...form, diaChiDong1: e.target.value })} />
+          {form.diaChiDong1 && form.diaChiDong1.trim().length < 5 && (
+            <p className="text-xs text-red-500 mt-0.5">Ít nhất 5 ký tự</p>
+          )}
         </div>
         <div className="col-span-2 flex items-center gap-2">
           <input type="checkbox" id="laMacDinh" checked={form.laMacDinh} onChange={e => setForm({ ...form, laMacDinh: e.target.checked })} />

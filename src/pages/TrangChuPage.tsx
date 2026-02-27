@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Truck, Shield, RefreshCw, Headphones } from 'lucide-react';
+import { ArrowRight, Truck, Shield, RefreshCw, Headphones, AlertCircle } from 'lucide-react';
 import { sanPhamApi } from '../services/api';
 import type { SanPhamItem, DanhMuc } from '../services/api';
 import ProductCard from '../components/ProductCard';
@@ -11,20 +11,61 @@ export default function TrangChuPage() {
   const [sanPhamMoi, setSanPhamMoi] = useState<SanPhamItem[]>([]);
   const [danhMuc, setDanhMuc] = useState<DanhMuc[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([
-      sanPhamApi.banChay(),
-      sanPhamApi.moi(),
-      sanPhamApi.danhMuc(),
-    ]).then(([banChay, moi, dm]) => {
-      setSanPhamBanChay(banChay.data.duLieu || []);
-      setSanPhamMoi(moi.data.duLieu || []);
-      setDanhMuc(dm.data.duLieu || []);
-    }).finally(() => setLoading(false));
+    loadData();
   }, []);
 
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [banChayRes, moiRes, dmRes] = await Promise.all([
+        sanPhamApi.banChay().catch(err => {
+          console.error('Failed to load best sellers:', err);
+          return { data: { duLieu: [] } };
+        }),
+        sanPhamApi.moi().catch(err => {
+          console.error('Failed to load new products:', err);
+          return { data: { duLieu: [] } };
+        }),
+        sanPhamApi.danhMuc().catch(err => {
+          console.error('Failed to load categories:', err);
+          return { data: { duLieu: [] } };
+        })
+      ]);
+      
+      setSanPhamBanChay(banChayRes?.data?.duLieu || []);
+      setSanPhamMoi(moiRes?.data?.duLieu || []);
+      setDanhMuc(dmRes?.data?.duLieu || []);
+    } catch (err) {
+      console.error('Error loading homepage data:', err);
+      setError('Có lỗi khi tải dữ liệu. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) return <LoadingSpinner fullPage />;
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-16 text-center">
+        <div className="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-4">
+          <AlertCircle className="w-8 h-8 text-red-600" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Lỗi khi tải trang</h2>
+        <p className="text-gray-600 mb-8">{error}</p>
+        <button
+          onClick={loadData}
+          className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors"
+        >
+          Thử lại
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div>

@@ -5,6 +5,21 @@ import { authApi } from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import toast from 'react-hot-toast';
 
+// Validation helpers
+const isValidEmail = (email: string): boolean => {
+  if (!email) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+};
+
+const isValidPhoneNumber = (phone: string): boolean => {
+  if (!phone) return true; // optional field
+  return /^(\+84|0)[0-9]{9,10}$/.test(phone.replace(/\s/g, ''));
+};
+
+const isValidUsername = (username: string): boolean => {
+  return /^[a-zA-Z0-9_]{3,20}$/.test(username);
+};
+
 export default function DangKyPage() {
   const [form, setForm] = useState({
     tenDangNhap: '', matKhau: '', xacNhanMatKhau: '',
@@ -22,6 +37,22 @@ export default function DangKyPage() {
     e.preventDefault();
     if (!form.tenDangNhap || !form.matKhau || !form.hoTen) {
       toast.error('Vui lòng điền đầy đủ thông tin bắt buộc');
+      return;
+    }
+    if (!isValidUsername(form.tenDangNhap)) {
+      toast.error('Tên đăng nhập phải 3-20 ký tự, chỉ gồm chữ, số, và dấu gạch dưới');
+      return;
+    }
+    if (form.hoTen.trim().length < 3) {
+      toast.error('Họ tên phải có ít nhất 3 ký tự');
+      return;
+    }
+    if (form.email && !isValidEmail(form.email)) {
+      toast.error('Email không hợp lệ');
+      return;
+    }
+    if (form.soDienThoai && !isValidPhoneNumber(form.soDienThoai)) {
+      toast.error('Số điện thoại không hợp lệ (10-11 chữ số)');
       return;
     }
     if (form.matKhau.length < 6) {
@@ -60,7 +91,7 @@ export default function DangKyPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center px-4 py-8">
+    <div className="min-h-screen bg-linear-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <div className="text-center mb-8">
@@ -83,22 +114,35 @@ export default function DangKyPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Tên đăng nhập <span className="text-red-500">*</span>
+                {form.tenDangNhap && !isValidUsername(form.tenDangNhap) && (
+                  <span className="text-red-500 text-xs ml-1">Không hợp lệ</span>
+                )}
               </label>
               <input type="text" value={form.tenDangNhap} onChange={set('tenDangNhap')}
-                placeholder="vd: nguyenvana (chữ, số, dấu _)" className="input-field" autoComplete="username" />
-              <p className="text-xs text-gray-400 mt-1">Chỉ gồm chữ cái, số và dấu gạch dưới, không có @</p>
+                placeholder="vd: nguyenvana (chữ, số, dấu _)" 
+                className={`input-field ${form.tenDangNhap && !isValidUsername(form.tenDangNhap) ? 'border-red-400' : ''}`} 
+                autoComplete="username" />
+              <p className="text-xs text-gray-400 mt-1">3-20 ký tự, chỉ gồm chữ cái, số và dấu gạch dưới</p>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
               <input type="email" value={form.email} onChange={set('email')}
-                placeholder="email@example.com" className="input-field" />
+                placeholder="email@example.com" 
+                className={`input-field ${form.email && !isValidEmail(form.email) ? 'border-red-400' : ''}`} />
+              {form.email && !isValidEmail(form.email) && (
+                <p className="text-xs text-red-500 mt-1">Email không hợp lệ</p>
+              )}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Số điện thoại</label>
               <input type="tel" value={form.soDienThoai} onChange={set('soDienThoai')}
-                placeholder="0912345678" className="input-field" />
+                placeholder="0912345678" 
+                className={`input-field ${form.soDienThoai && !isValidPhoneNumber(form.soDienThoai) ? 'border-red-400' : ''}`} />
+              {form.soDienThoai && !isValidPhoneNumber(form.soDienThoai) && (
+                <p className="text-xs text-red-500 mt-1">Số điện thoại không hợp lệ</p>
+              )}
             </div>
 
             <div>

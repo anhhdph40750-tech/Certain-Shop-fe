@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ShoppingCart, ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react';
+import { ShoppingCart, ChevronLeft, ChevronRight, Minus, Plus, X, Info } from 'lucide-react';
 import { sanPhamApi, gioHangApi } from '../services/api';
 import type { SanPhamDetail } from '../services/api';
 import { useAuthStore } from '../stores/authStore';
@@ -15,9 +15,13 @@ export default function ChiTietSanPhamPage() {
   const [soLuong, setSoLuong] = useState(1);
   const [selectedAnh, setSelectedAnh] = useState(0);
   const [loading, setLoading] = useState(true);
-  const { isLoggedIn, isNhanVien } = useAuthStore();
+  const [showInfo, setShowInfo] = useState(false);
+  const { isLoggedIn, isNhanVien, isAdmin } = useAuthStore();
   const { increment } = useCartStore();
   const navigate = useNavigate();
+
+  // Check if user is staff/admin (not customer)
+  const isStaffOrAdmin = isNhanVien() || isAdmin();
 
   // ── Selections (source of truth — never set from derived state) ──
   const [selectedColor, setSelectedColor] = useState<number | null>(null);
@@ -151,7 +155,7 @@ export default function ChiTietSanPhamPage() {
             <div className="flex gap-2 overflow-x-auto pb-2">
               {images.map((img, i) => (
                 <button key={i} onClick={() => setSelectedAnh(i)}
-                  className={`w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all ${i === selectedAnh ? 'border-indigo-500' : 'border-transparent'}`}>
+                  className={`w-16 h-16 rounded-lg overflow-hidden shrink-0 border-2 transition-all ${i === selectedAnh ? 'border-indigo-500' : 'border-transparent'}`}>
                   <img src={getImageUrl(img.duongDan)} alt="" className="w-full h-full object-cover" />
                 </button>
               ))}
@@ -264,20 +268,34 @@ export default function ChiTietSanPhamPage() {
             </div>
           </div>
 
-          {/* Buttons */}
-          <div className="flex gap-3">
-            <button onClick={handleAddToCart}
-              disabled={!selectedBienThe || selectedBienThe.soLuongTon === 0}
-              className="flex-1 btn-secondary flex items-center justify-center gap-2 py-3 disabled:opacity-50">
-              <ShoppingCart className="w-5 h-5" />
-              Thêm vào giỏ
-            </button>
-            <button onClick={handleBuyNow}
-              disabled={!selectedBienThe || selectedBienThe.soLuongTon === 0}
-              className="flex-1 btn-primary py-3 disabled:opacity-50">
-              Mua ngay
-            </button>
-          </div>
+          {/* Buttons / Staff Info */}
+          {isStaffOrAdmin ? (
+            <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6 space-y-3">
+              <div className="flex items-center gap-2 text-blue-700 font-semibold">
+                <Info className="w-5 h-5" />
+                Thông tin dành cho nhân viên
+              </div>
+              <button
+                onClick={() => setShowInfo(true)}
+                className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors">
+                Xem chi tiết sản phẩm
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-3">
+              <button onClick={handleAddToCart}
+                disabled={!selectedBienThe || selectedBienThe.soLuongTon === 0}
+                className="flex-1 btn-secondary flex items-center justify-center gap-2 py-3 disabled:opacity-50">
+                <ShoppingCart className="w-5 h-5" />
+                Thêm vào giỏ
+              </button>
+              <button onClick={handleBuyNow}
+                disabled={!selectedBienThe || selectedBienThe.soLuongTon === 0}
+                className="flex-1 btn-primary py-3 disabled:opacity-50">
+                Mua ngay
+              </button>
+            </div>
+          )}
 
           {/* Description */}
           {sanPham.moTa && (
@@ -290,6 +308,107 @@ export default function ChiTietSanPhamPage() {
           )}
         </div>
       </div>
-    </div>
+
+      {/* Product Info Modal for Staff/Admin */}
+      {isStaffOrAdmin && showInfo && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-indigo-600 text-white px-6 py-4 flex items-center justify-between border-b border-indigo-700">
+              <h2 className="text-xl font-bold">Chi tiết sản phẩm</h2>
+              <button
+                onClick={() => setShowInfo(false)}
+                className="p-1 hover:bg-indigo-500 rounded-lg transition-colors">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Product Header */}
+              <div className="flex gap-6">
+                <div className="w-32 h-32 flex-shrink-0 bg-gray-100 rounded-xl overflow-hidden">
+                  {images.length > 0 ? (
+                    <img src={getImageUrl(images[0].duongDan)} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-4xl">👕</div>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-indigo-600 font-semibold mb-2">{sanPham.danhMuc?.tenDanhMuc}</p>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2">{sanPham.tenSanPham}</h3>
+                  <p className="text-gray-600 text-sm mb-4">{sanPham.thuongHieu?.tenThuongHieu || 'N/A'}</p>
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-3xl font-bold text-indigo-600">{formatCurrency(gia)}</span>
+                    {sanPham.giaGoc > gia && (
+                      <span className="text-lg text-gray-400 line-through">{formatCurrency(sanPham.giaGoc)}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Stock Status */}
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <p className="font-semibold text-gray-900 mb-3">Tình trạng kho:</p>
+                {sanPham.bienThe && sanPham.bienThe.length > 0 ? (
+                  <div className="space-y-2">
+                    {sanPham.bienThe.map((bt, idx) => (
+                      <div key={bt.id} className="text-sm">
+                        <span className="font-medium text-gray-700">
+                          {idx + 1}. {bt.mauSac?.tenMauSac && `${bt.mauSac.tenMauSac}`}
+                          {bt.mauSac?.tenMauSac && bt.kichThuoc?.tenKichThuoc && ' - '}
+                          {bt.kichThuoc?.tenKichThuoc && `${bt.kichThuoc.tenKichThuoc}`}
+                        </span>
+                        <span className={`ml-2 font-semibold ${bt.soLuongTon > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {bt.soLuongTon} {bt.soLuongTon > 0 ? '✓' : '✗'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-600">Chưa có dữ liệu biến thể</p>
+                )}
+              </div>
+
+              {/* Description */}
+              {sanPham.moTa && (
+                <div className="border-t pt-4">
+                  <p className="font-semibold text-gray-900 mb-3">Mô tả:</p>
+                  <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap">{sanPham.moTa}</p>
+                </div>
+              )}
+
+              {/* Product Attributes */}
+              <div className="bg-gray-50 rounded-xl p-4">
+                <p className="font-semibold text-gray-900 mb-3">Thông tin sản phẩm:</p>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-600">Mã sản phẩm:</p>
+                    <p className="font-semibold text-gray-900">{sanPham.maSanPham}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Danh mục:</p>
+                    <p className="font-semibold text-gray-900">{sanPham.danhMuc?.tenDanhMuc || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Thương hiệu:</p>
+                    <p className="font-semibold text-gray-900">{sanPham.thuongHieu?.tenThuongHieu || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Trạng thái:</p>
+                    <p className="font-semibold text-green-600">Hoạt động</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Close Button */}
+              <button
+                onClick={() => setShowInfo(false)}
+                className="w-full bg-gray-200 hover:bg-gray-300 text-gray-900 py-3 rounded-lg font-semibold transition-colors">
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}    </div>
   );
 }

@@ -64,7 +64,7 @@ export default function Header() {
         {/* Main header */}
         <div className="flex items-center h-16 gap-4">
           {/* Logo */}
-          <Link to="/" className="flex-shrink-0 flex items-center gap-2">
+          <Link to="/" className="shrink-0 flex items-center gap-2">
             <div className="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-lg">C</span>
             </div>
@@ -86,7 +86,7 @@ export default function Header() {
           </form>
 
           {/* Actions */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {/* Cart */}
             <Link to="/gio-hang" className="relative p-2 text-gray-600 hover:text-indigo-600 transition-colors">
               <ShoppingCart className="w-6 h-6" />

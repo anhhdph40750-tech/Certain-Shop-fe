@@ -22,6 +22,7 @@ api.interceptors.response.use(
   (err) => {
     if (err.response?.status === 401) {
       const isAuthRequest = err.config?.url?.includes('/auth/');
+      // Only redirect to login if not an auth request (login, register, etc.)
       if (!isAuthRequest) {
         localStorage.removeItem('auth-storage');
         if (window.location.pathname !== '/dang-nhap') {
@@ -117,6 +118,7 @@ export interface GioHangChiTiet {
     kichThuoc: string;    // string, e.g. "L" — không phải object
     tenMauSac: string;
     maHexMauSac: string;
+    gia?: number;          // optional price in case backend includes it
   };
 }
 
@@ -147,6 +149,22 @@ export interface LichSuTrangThai {
   trangThai: string;
   ghiChu: string;
   thoiGianTao: string;
+}
+
+/** Voucher */
+export interface Voucher {
+  id: number;
+  maVoucher: string;
+  moTa: string;
+  trangThai: boolean;
+  ngayBatDau: string;
+  ngayKetThuc: string;
+  giaTriToiThieu?: number;
+  giaTriGiamToiDa: number;
+  loaiGiam: string; // "PERCENT" or "FIXED"
+  giaTriGiam: number;
+  soLuongSuDung: number;
+  soLuongToiDa?: number;
 }
 
 /** Đơn hàng - fields từ toDonHangSummary + toDonHangDetail backend */
@@ -240,11 +258,18 @@ export const sanPhamApi = {
   /** GET /danh-muc/{duongDan}/san-pham → { danhSach, tongSoTrang, tongSoBan, trangHienTai } */
   sanPhamTheoDanhMuc: (duongDan: string, trang = 0, kichThuocTrang = 12) =>
     api.get<ApiResponse<{ danhSach: SanPhamItem[]; tongSoTrang: number; tongSoBan: number; trangHienTai: number }>>(`/danh-muc/${duongDan}/san-pham`, { params: { trang, kichThuocTrang } }),
-
+  /** GHN shipping api */
+  ghn: {
+    tinhPhi: (maHuyenNhan: number, maXaNhan: string, weight = 0) =>
+      api.post<ApiResponse<{ fee: number }>>('/ghn/fee', {}, { params: { maHuyenNhan, maXaNhan, weight } }),
+  },
   /** GET /thuong-hieu → { id, tenThuongHieu, moTa }[] */
   thuongHieu: () =>
     api.get<ApiResponse<ThuongHieu[]>>('/thuong-hieu'),
 };
+
+// alias to easily import GHN endpoints directly from sanPhamApi
+export const ghnApi = sanPhamApi.ghn;
 
 // ===================== GIỎ HÀNG =====================
 
@@ -429,6 +454,9 @@ export const adminApi = {
   taoBienThe: (sanPhamId: number, data: unknown) =>
     api.post<ApiResponse<unknown>>(`/quan-ly/san-pham/${sanPhamId}/bien-the`, data),
 
+  taoBulkBienThe: (sanPhamId: number, danhSachBienThe: unknown[]) =>
+    api.post<ApiResponse<unknown>>(`/quan-ly/san-pham/${sanPhamId}/bien-the/bulk`, danhSachBienThe),
+
   capNhatBienThe: (bienTheId: number, data: unknown) =>
     api.put<ApiResponse<unknown>>(`/quan-ly/san-pham/bien-the/${bienTheId}`, data),
 
@@ -474,6 +502,18 @@ export const adminApi = {
 export interface MauSac { id: number; tenMau: string; maHex: string; moTa?: string; }
 export interface KichThuoc { id: number; kichCo: string; thuTu?: number; }
 export interface ChatLieu { id: number; tenChatLieu: string; moTa?: string; }
+
+export const voucherApi = {
+  danhSachVoucherHoatDong: () => api.get<ApiResponse<Voucher[]>>('/voucher/hoat-dong'),
+  danhSachTatCa: () => api.get<ApiResponse<Voucher[]>>('/voucher/all'),
+  taoVoucher: (data: unknown) => api.post<ApiResponse<Voucher>>('/voucher', data),
+  capNhatVoucher: (id: number, data: unknown) => api.put<ApiResponse<Voucher>>(`/voucher/${id}`, data),
+  xoaVoucher: (id: number) => api.delete<ApiResponse<null>>(`/voucher/${id}`),
+  tinhGiaTriGiam: (maVoucher: string, giaTriDonHang: number) =>
+    api.get<ApiResponse<{ maVoucher: string; giaTriGiam: number; giaTriSauGiam: number; hopLe: boolean }>>(
+      `/voucher/tinh-giam?maVoucher=${maVoucher}&giaTriDonHang=${giaTriDonHang}`
+    ),
+};
 
 export const thuocTinhApi = {
   // Màu sắc

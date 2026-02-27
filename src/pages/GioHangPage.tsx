@@ -65,7 +65,11 @@ export default function GioHangPage() {
     }
   };
 
-  const tongTien = gioHang?.danhSachChiTiet?.reduce((sum, ct) => sum + (ct.thanhTien || 0), 0) || 0;
+  // fallback when server returns zero price
+  const getDonGia = (ct: GioHang['danhSachChiTiet'][0]) => ct.donGia || ct.bienThe?.gia || 0;
+  const getThanhTien = (ct: GioHang['danhSachChiTiet'][0]) => getDonGia(ct) * ct.soLuong;
+  const tongTien =
+    gioHang?.danhSachChiTiet?.reduce((sum, ct) => sum + getThanhTien(ct), 0) || 0;
 
   if (loading) return <LoadingSpinner fullPage />;
 
@@ -98,9 +102,11 @@ export default function GioHangPage() {
         <div className="lg:col-span-2 space-y-4">
           {gioHang.danhSachChiTiet.map(ct => {
             const bt = ct.bienThe;
+            const donGia = getDonGia(ct);
+            const thanhTien = getThanhTien(ct);
             return (
               <div key={ct.id} className="bg-white rounded-xl p-4 border border-gray-100 flex gap-4">
-                <Link to={bt?.duongDanSanPham ? `/san-pham/${bt.duongDanSanPham}` : '#'} className="flex-shrink-0">
+                <Link to={bt?.duongDanSanPham ? `/san-pham/${bt.duongDanSanPham}` : '#'} className="shrink-0">
                   <img
                     src={bt?.anhChinh ? getImageUrl(bt.anhChinh) : PLACEHOLDER_IMG}
                     alt={bt?.tenSanPham}
@@ -118,7 +124,7 @@ export default function GioHangPage() {
                     {bt?.tenMauSac && <span>Màu: {bt.tenMauSac}</span>}
                     {bt?.kichThuoc && <span>• Size: {bt.kichThuoc}</span>}
                   </div>
-                  <p className="text-indigo-600 font-semibold text-sm mt-1">{formatCurrency(ct.donGia)}</p>
+                  <p className="text-indigo-600 font-semibold text-sm mt-1">{formatCurrency(donGia)}</p>
 
                   <div className="flex items-center justify-between mt-3">
                     <div className="flex items-center border border-gray-200 rounded-lg">
@@ -140,7 +146,7 @@ export default function GioHangPage() {
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <span className="font-bold text-gray-900 text-sm">{formatCurrency(ct.thanhTien)}</span>
+                      <span className="font-bold text-gray-900 text-sm">{formatCurrency(thanhTien)}</span>
                       <button onClick={() => handleXoa(ct.id)} disabled={updating === ct.id}
                         className="text-red-400 hover:text-red-600 transition-colors">
                         <Trash2 className="w-4 h-4" />

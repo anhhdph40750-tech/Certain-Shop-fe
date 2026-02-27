@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Plus, Edit2, Trash2, Eye, Upload, X, ImageIcon } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Search, Plus, Edit2, Trash2, Eye, Upload, X } from 'lucide-react';
 import { adminApi, sanPhamApi, thuocTinhApi } from '../../services/api';
-import type { SanPhamItem, SanPhamDetail, BienThe as BienTheType, DanhMuc, ThuongHieu, MauSac, KichThuoc, ChatLieu } from '../../services/api';
+import type { SanPhamItem, BienThe as BienTheType, DanhMuc, ThuongHieu, MauSac, KichThuoc, ChatLieu } from '../../services/api';
 import { formatCurrency, getImageUrl, trangThaiSanPhamLabel, handleImgError } from '../../utils/format';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -195,12 +195,16 @@ function SanPhamForm({ editingSanPham, danhMuc, thuongHieu, onSave, onCancel }: 
   // --- inline variants for NEW product ---
   const [inlineBTs, setInlineBTs] = useState<BienTheForm[]>([]);
 
+  // --- bulk add mode ---
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkBTList, setBulkBTList] = useState<BienTheForm[]>([]);
+  const [bulkSaving, setBulkSaving] = useState(false);
+
   // product ID after initial save (for new products → switch to edit mode)
   const [savedProductId, setSavedProductId] = useState<number | null>(editingSanPham?.id || null);
   const [savedDuongDan, setSavedDuongDan] = useState<string | null>(editingSanPham?.duongDan || null);
 
   // upload
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingBTId, setUploadingBTId] = useState<number | null>(null);
 
   const isEditMode = !!editingSanPham || !!savedProductId;
@@ -338,6 +342,33 @@ function SanPhamForm({ editingSanPham, danhMuc, thuongHieu, onSave, onCancel }: 
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { thongBao?: string } } })?.response?.data?.thongBao || 'Lỗi thêm biến thể';
       toast.error(msg);
+    }
+  };
+
+  const addBulkVariants = async () => {
+    if (!savedProductId || bulkBTList.length === 0) {
+      toast.error('Không có biến thể để thêm');
+      return;
+    }
+    setBulkSaving(true);
+    try {
+      await adminApi.taoBulkBienThe(savedProductId, bulkBTList.map(bt => ({
+        kichThuocId: bt.kichThuocId ? Number(bt.kichThuocId) : null,
+        mauSacId: bt.mauSacId ? Number(bt.mauSacId) : null,
+        chatLieuId: bt.chatLieuId ? Number(bt.chatLieuId) : null,
+        gia: bt.gia ? Number(bt.gia) : null,
+        soLuongTon: bt.soLuongTon ? Number(bt.soLuongTon) : 0,
+        macDinh: bt.macDinh,
+      })));
+      toast.success(`Thêm ${bulkBTList.length} biến thể thành công`);
+      setBulkBTList([]);
+      setBulkMode(false);
+      await reloadVariants();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { thongBao?: string } } })?.response?.data?.thongBao || 'Lỗi thêm bulk biến thể';
+      toast.error(msg);
+    } finally {
+      setBulkSaving(false);
     }
   };
 
@@ -615,13 +646,76 @@ function SanPhamForm({ editingSanPham, danhMuc, thuongHieu, onSave, onCancel }: 
         )}
 
         {/* Add variant form */}
-        <div className="grid grid-cols-3 md:grid-cols-7 gap-2 items-end">
+        <div className="grid grid-cols-3 md:grid-cols-7 gap-2 items-end mb-3">
           {renderBTSelects(newBT, setNewBT)}
           <button type="button" onClick={addVariant}
             className="btn-primary text-xs px-3 py-2 flex items-center gap-1 justify-center">
             <Plus className="w-3 h-3" /> Thêm
           </button>
         </div>
+
+        {/* Bulk add mode toggle and form */}
+        {isEditMode && (
+          <>
+            <button type="button" onClick={() => setBulkMode(!bulkMode)}
+              className="btn-secondary text-xs mb-3 px-3 py-1.5 flex items-center gap-1">
+              <Plus className="w-3 h-3" /> Thêm bulk ({bulkBTList.length})
+            </button>
+
+            {bulkMode && (
+              <div className="bg-blue-50 border-l-4 border-blue-400 p-3 mb-4 rounded">
+                <h5 className="font-medium text-blue-900 mb-2 text-sm">Thêm nhiều biến thể cùng lúc</h5>
+                
+                {/* Display bulk list */}
+                {bulkBTList.length > 0 && (
+                  <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
+                    {bulkBTList.map((bt, idx) => (
+                      <div key={idx} className="flex items-center gap-2 text-xs bg-white p-2 rounded border border-blue-200">
+                        <span className="w-5 text-center text-gray-400">#{idx + 1}</span>
+                        <span className="flex-1">{kichThuocOptions.find(k => String(k.id) === bt.kichThuocId)?.kichCo || '—'} | {mauSacOptions.find(m => String(m.id) === bt.mauSacId)?.tenMau || '—'} | {chatLieuOptions.find(c => String(c.id) === bt.chatLieuId)?.tenChatLieu || '—'}</span>
+                        <span className="font-semibold">{bt.gia ? formatCurrency(Number(bt.gia)) : '—'}</span>
+                        <span className="text-gray-400">SL: {bt.soLuongTon}</span>
+                        <button onClick={() => setBulkBTList(prev => prev.filter((_, i) => i !== idx))}
+                          className="p-0.5 text-red-400 hover:text-red-600"><X className="w-3 h-3" /></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Bulk input form */}
+                <div className="bg-white p-3 rounded border border-blue-200 mb-3">
+                  <div className="grid grid-cols-3 md:grid-cols-7 gap-2 items-end mb-2">
+                    {renderBTSelects(newBT, setNewBT)}
+                    <button type="button" onClick={() => {
+                      if (!newBT.kichThuocId || !newBT.mauSacId || !newBT.chatLieuId || !newBT.gia) {
+                        toast.error('Vui lòng điền đầy đủ thông tin');
+                        return;
+                      }
+                      setBulkBTList(prev => [...prev, { ...newBT, gia: newBT.gia || '0' }]);
+                      setNewBT({ ...EMPTY_BT, soLuongTon: '10' });
+                    }}
+                      className="btn-primary text-xs px-2 py-2 flex items-center gap-1 justify-center whitespace-nowrap col-span-1">
+                      <Plus className="w-3 h-3" /> Add
+                    </button>
+                  </div>
+                </div>
+
+                {/* Bulk actions */}
+                <div className="flex gap-2">
+                  <button type="button" onClick={addBulkVariants} disabled={bulkSaving}
+                    className="btn-primary text-xs px-3 py-1.5">
+                    {bulkSaving ? `Đang thêm ${bulkBTList.length}...` : `✓ Lưu ${bulkBTList.length} biến thể`}
+                  </button>
+                  <button type="button" onClick={() => { setBulkMode(false); setBulkBTList([]); }}
+                    className="btn-secondary text-xs px-3 py-1.5">
+                    Hủy
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
         {!isEditMode && (
           <p className="text-xs text-gray-400 mt-2">
             Thêm biến thể trước khi lưu. Sau khi lưu sản phẩm, bạn có thể upload ảnh cho từng biến thể.
