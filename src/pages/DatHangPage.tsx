@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { gioHangApi, donHangApi, taiKhoanApi } from '../services/api';
+import { gioHangApi, donHangApi, taiKhoanApi, diaChiApi } from '../services/api';
 import type { GioHang, DiaChi } from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import { useCartStore } from '../stores/cartStore';
@@ -21,6 +21,11 @@ export default function DatHangPage() {
   const [tenNguoiNhan, setTenNguoiNhan] = useState('');
   const [sdtNguoiNhan, setSdtNguoiNhan] = useState('');
   const [diaChiGiaoHang, setDiaChiGiaoHang] = useState('');
+  
+  // GHN shipping
+  const [phiVanChuyen, setPhiVanChuyen] = useState<number>(0);
+  const [loadingShip, setLoadingShip] = useState(false);
+
   const { isLoggedIn } = useAuthStore();
   const { setCount } = useCartStore();
   const navigate = useNavigate();
@@ -46,6 +51,10 @@ export default function DatHangPage() {
         setTenNguoiNhan(macDinh.hoTen || '');
         setSdtNguoiNhan(macDinh.soDienThoai || '');
         setDiaChiGiaoHang(`${macDinh.diaChiDong1}, ${macDinh.phuongXa}, ${macDinh.quanHuyen}, ${macDinh.tinhThanh}`);
+        // Tính phí vận chuyển cho địa chỉ mặc định
+        if (macDinh.maHuyenGHN && macDinh.maXaGHN) {
+          tinhPhiVanChuyen(macDinh.maHuyenGHN, macDinh.maXaGHN);
+        }
       } else {
         const nd = thongTinRes.data.duLieu;
         setTenNguoiNhan(nd.hoTen || '');
@@ -53,6 +62,44 @@ export default function DatHangPage() {
       }
     }).finally(() => setLoading(false));
   }, [isLoggedIn, navigate]);
+
+  /**
+   * Tính phí vận chuyển từ GHN
+   */
+  const tinhPhiVanChuyen = async (maHuyen: number, maXa: string) => {
+    setLoadingShip(true);
+    try {
+      // Tính tổng trọng lượng (mặc định 1 sản phẩm = 300g, nhưng có thể get từ BE)
+      const tongKg = gioHang?.danhSachChiTiet?.length || 1;
+      const trongLuongGram = tongKg * 300;
+
+      const res = await diaChiApi.tinhPhiVanChuyen(maHuyen, maXa, trongLuongGram);
+      const phi = res.data.duLieu?.phiVanChuyen || 0;
+      setPhiVanChuyen(phi);
+    } catch (err) {
+      // Nếu lỗi, dùng phí mặc định
+      console.error('Lỗi tính phí:', err);
+      setPhiVanChuyen(35000);
+      toast.error('Không thể lấy phí vận chuyển, dùng phí mặc định');
+    } finally {
+      setLoadingShip(false);
+    }
+  };
+
+  const handleDiaChiChange = (dc: DiaChi) => {
+    setSelectedDiaChi(dc);
+    setTenNguoiNhan(dc.hoTen || '');
+    setSdtNguoiNhan(dc.soDienThoai || '');
+    setDiaChiGiaoHang(`${dc.diaChiDong1}, ${dc.phuongXa}, ${dc.quanHuyen}, ${dc.tinhThanh}`);
+    
+    // Tính phí vận chuyển
+    if (dc.maHuyenGHN && dc.maXaGHN) {
+      tinhPhiVanChuyen(dc.maHuyenGHN, dc.maXaGHN);
+    } else {
+      // Nếu không có mã GHN, dùng phí mặc định
+      setPhiVanChuyen(35000);
+    }
+  };
 
   const handleKiemTraKhuyenMai = async () => {
     if (!maKhuyenMai.trim()) return;
@@ -81,6 +128,7 @@ export default function DatHangPage() {
         phuongThucThanhToan: phuongThuc,
         ghiChu,
         khuyenMaiId: khuyenMai?.id || null,
+        phiVanChuyen: phiVanChuyen,
       };
       if (selectedDiaChi?.id) {
         payload.diaChiId = selectedDiaChi.id;
@@ -112,7 +160,7 @@ export default function DatHangPage() {
 
   const tongHang = gioHang?.danhSachChiTiet?.reduce((s, ct) => s + (ct.thanhTien || 0), 0) || 0;
   const soTienGiam = khuyenMai?.soTienGiam || 0;
-  const tongThanhToan = tongHang - soTienGiam;
+  const tongThanhToan = tongHang - soTienGiam + phiVanChuyen;
 
   if (loading) return <LoadingSpinner fullPage />;
 
@@ -136,12 +184,7 @@ export default function DatHangPage() {
                     <label key={dc.id}
                       className={`flex gap-3 p-3 rounded-lg border cursor-pointer transition-all ${selectedDiaChi?.id === dc.id ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}>
                       <input type="radio" name="diachi" checked={selectedDiaChi?.id === dc.id}
-                        onChange={() => {
-                          setSelectedDiaChi(dc);
-                          setTenNguoiNhan(dc.hoTen || '');
-                          setSdtNguoiNhan(dc.soDienThoai || '');
-                          setDiaChiGiaoHang(`${dc.diaChiDong1}, ${dc.phuongXa}, ${dc.quanHuyen}, ${dc.tinhThanh}`);
-                        }}
+                        onChange={() => handleDiaChiChange(dc)}
                         className="mt-0.5" />
                       <div>
                         <p className="font-medium text-sm">{dc.hoTen} · {dc.soDienThoai}</p>
@@ -242,7 +285,10 @@ export default function DatHangPage() {
                 </div>
               )}
               <div className="flex justify-between text-gray-600">
-                <span>Phí ship</span><span className="text-green-600">Miễn phí</span>
+                <span>Phí ship {loadingShip ? '(tính toán...)' : ''}</span>
+                <span className="text-green-600 font-medium">
+                  {loadingShip ? '...' : formatCurrency(phiVanChuyen)}
+                </span>
               </div>
               <div className="border-t pt-2 flex justify-between font-bold text-base">
                 <span>Tổng thanh toán</span>

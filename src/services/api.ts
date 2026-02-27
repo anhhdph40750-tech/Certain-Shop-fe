@@ -290,6 +290,10 @@ export const donHangApi = {
   /** POST /khuyen-mai/kiem-tra */
   kiemTraKhuyenMai: (maKhuyenMai: string, tongTienHang: number) =>
     api.post<ApiResponse<{ id: number; maKhuyenMai: string; tenKhuyenMai: string; soTienGiam: number }>>('/khuyen-mai/kiem-tra', { maKhuyenMai, tongTienHang }),
+
+  /** GET /vnpay-return — xác thực thanh toán VNPay (gọi từ VNPayReturnPage) */
+  xacThucVNPayReturn: (params: Record<string, string>) =>
+    api.get<ApiResponse<{ maDonHang: string; donHangId: number; maGiaoDich: string; tongTienThanhToan: number; trangThaiDonHang: string }>>('/vnpay-return', { params }),
 };
 
 // ===================== TÀI KHOẢN =====================
@@ -326,6 +330,52 @@ export const taiKhoanApi = {
   /** PUT /tai-khoan/dia-chi/{id}/mac-dinh */
   datLamMacDinh: (id: number) =>
     api.put<ApiResponse<null>>(`/tai-khoan/dia-chi/${id}/mac-dinh`),
+};
+
+// ===================== ĐỊA CHỈ & GHN =====================
+
+export const diaChiApi = {
+  // --- API GHN ---
+  /** GET /dia-chi/tinh-thanh → { ProvinceID, ProvinceName }[] */
+  layDanhSachTinh: () =>
+    api.get<ApiResponse<{ ProvinceID: number; ProvinceName: string }[]>>('/dia-chi/tinh-thanh'),
+
+  /** GET /dia-chi/quan-huyen?maTinh=xx → { DistrictID, DistrictName }[] */
+  layDanhSachHuyen: (maTinh: number) =>
+    api.get<ApiResponse<{ DistrictID: number; DistrictName: string }[]>>('/dia-chi/quan-huyen', { params: { maTinh } }),
+
+  /** GET /dia-chi/phuong-xa?maHuyen=xx → { WardCode, WardName }[] */
+  layDanhSachXa: (maHuyen: number) =>
+    api.get<ApiResponse<{ WardCode: string; WardName: string }[]>>('/dia-chi/phuong-xa', { params: { maHuyen } }),
+
+  /** POST /dia-chi/tinh-phi-ship?maHuyen=xx&maXa=xx&trongLuong=xx → { phiVanChuyen: number } */
+  tinhPhiVanChuyen: (maHuyen: number, maXa: string, trongLuong = 500) =>
+    api.post<ApiResponse<{ phiVanChuyen: number }>>('/dia-chi/tinh-phi-ship', {}, { params: { maHuyen, maXa, trongLuong } }),
+
+  // --- Quản lý địa chỉ (new endpoints) ---
+  /** GET /dia-chi/user-addresses → DiaChiChiTietDto[] */
+  layDanhSachDiaChiNguoiDung: () =>
+    api.get<ApiResponse<DiaChi[]>>('/dia-chi/user-addresses'),
+
+  /** GET /dia-chi/{diaChiId} → DiaChiChiTietDto */
+  layChiTietDiaChi: (diaChiId: number) =>
+    api.get<ApiResponse<DiaChi>>(`/dia-chi/${diaChiId}`),
+
+  /** POST /dia-chi → DiaChiChiTietDto */
+  taoDiaChi: (diaChi: Omit<DiaChi, 'id'>) =>
+    api.post<ApiResponse<DiaChi>>('/dia-chi', diaChi),
+
+  /** PUT /dia-chi/{diaChiId} → DiaChiChiTietDto */
+  capNhatDiaChi: (diaChiId: number, diaChi: Partial<DiaChi>) =>
+    api.put<ApiResponse<DiaChi>>(`/dia-chi/${diaChiId}`, diaChi),
+
+  /** DELETE /dia-chi/{diaChiId} */
+  xoaDiaChi: (diaChiId: number) =>
+    api.delete<ApiResponse<null>>(`/dia-chi/${diaChiId}`),
+
+  /** POST /dia-chi/{diaChiId}/set-default */
+  datLamMacDinh: (diaChiId: number) =>
+    api.post<ApiResponse<null>>(`/dia-chi/${diaChiId}/set-default`),
 };
 
 // ===================== ADMIN =====================

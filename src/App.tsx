@@ -14,6 +14,7 @@ import ChiTietSanPhamPage from './pages/ChiTietSanPhamPage';
 import DanhMucSanPhamPage from './pages/DanhMucSanPhamPage';
 import GioHangPage from './pages/GioHangPage';
 import DatHangPage from './pages/DatHangPage';
+import VNPayReturnPage from './pages/VNPayReturnPage';
 import DonHangCuaToiPage from './pages/DonHangCuaToiPage';
 import ChiTietDonHangPage from './pages/ChiTietDonHangPage';
 import TaiKhoanPage from './pages/TaiKhoanPage';
@@ -53,6 +54,7 @@ export default function App() {
           {/* Auth pages - no layout */}
           <Route path="/dang-nhap" element={<DangNhapPage />} />
           <Route path="/dang-ky" element={<DangKyPage />} />
+          <Route path="/vnpay-return" element={<VNPayReturnPage />} />
 
           {/* Customer pages with Header+Footer */}
           <Route path="/" element={<CustomerLayout><TrangChuPage /></CustomerLayout>} />
