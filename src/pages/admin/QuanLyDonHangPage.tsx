@@ -109,8 +109,9 @@ export default function QuanLyDonHangPage() {
         setExpanded(null);
         setChiTietDonHang(null);
       }
-    } catch {
-      toast.error('Cập nhật thất bại');
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.thongBao || 'Cập nhật thất bại';
+      toast.error(errorMessage);
     }
   };
 

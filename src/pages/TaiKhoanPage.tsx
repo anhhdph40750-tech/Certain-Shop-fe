@@ -335,27 +335,21 @@ function AddressForm({ initial, onSave, onCancel }: { initial: DiaChi | null; on
       <form onSubmit={save} className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">
-            Tên người nhận
+            Tên người nhận *
             {form.hoTen && form.hoTen.trim().length < 3 && (
-              <span className="text-red-500 ml-1">*</span>
+              <span className="text-red-500 ml-1">(Ít nhất 3 ký tự)</span>
             )}
           </label>
           <input className={`input-field text-sm ${form.hoTen && form.hoTen.trim().length < 3 ? 'border-red-400' : ''}`} required value={form.hoTen} onChange={e => setForm({ ...form, hoTen: e.target.value })} />
-          {form.hoTen && form.hoTen.trim().length < 3 && (
-            <p className="text-xs text-red-500 mt-0.5">Ít nhất 3 ký tự</p>
-          )}
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">
-            Số điện thoại
+            Số điện thoại *
             {form.soDienThoai && !isValidPhoneNumber(form.soDienThoai) && (
-              <span className="text-red-500 ml-1">*</span>
+              <span className="text-red-500 ml-1">(10-11 chữ số)</span>
             )}
           </label>
           <input className={`input-field text-sm ${form.soDienThoai && !isValidPhoneNumber(form.soDienThoai) ? 'border-red-400' : ''}`} required value={form.soDienThoai} onChange={e => setForm({ ...form, soDienThoai: e.target.value })} />
-          {form.soDienThoai && !isValidPhoneNumber(form.soDienThoai) && (
-            <p className="text-xs text-red-500 mt-0.5">10-11 chữ số</p>
-          )}
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Tỉnh/Thành phố *</label>
@@ -380,15 +374,12 @@ function AddressForm({ initial, onSave, onCancel }: { initial: DiaChi | null; on
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">
-            Địa chỉ cụ thể
+            Địa chỉ cụ thể *
             {form.diaChiDong1 && form.diaChiDong1.trim().length < 5 && (
-              <span className="text-red-500 ml-1">*</span>
+              <span className="text-red-500 ml-1">(Ít nhất 5 ký tự)</span>
             )}
           </label>
           <input className={`input-field text-sm ${form.diaChiDong1 && form.diaChiDong1.trim().length < 5 ? 'border-red-400' : ''}`} required value={form.diaChiDong1} onChange={e => setForm({ ...form, diaChiDong1: e.target.value })} />
-          {form.diaChiDong1 && form.diaChiDong1.trim().length < 5 && (
-            <p className="text-xs text-red-500 mt-0.5">Ít nhất 5 ký tự</p>
-          )}
         </div>
         <div className="col-span-2 flex items-center gap-2">
           <input type="checkbox" id="laMacDinh" checked={form.laMacDinh} onChange={e => setForm({ ...form, laMacDinh: e.target.checked })} />

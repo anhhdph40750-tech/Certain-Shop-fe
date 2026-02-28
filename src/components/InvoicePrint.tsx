@@ -2,6 +2,8 @@ import { useRef } from 'react';
 import { Printer, Download } from 'lucide-react';
 import { formatCurrency, formatDate } from '../utils/format';
 import type { DonHang } from '../services/api';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface InvoicePrintProps {
   donHang: DonHang;
@@ -27,39 +29,114 @@ export default function InvoicePrint({ donHang, onClose }: InvoicePrintProps) {
     printWindow.print();
   };
 
-  // PDF export using simple HTML table (can be enhanced with jsPDF)
-  const handleDownloadPDF = () => {
+  // Download as PDF with direct file download - PROVEN ENTERPRISE PATTERN
+  const handleDownloadPDF = async () => {
     const element = printRef.current;
     if (!element) return;
 
-    // Create canvas from HTML
-    const canvas = document.createElement('canvas');
-    canvas.width = 800;
-    canvas.height = 1000;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    let container: HTMLElement | null = null;
+    try {
+      // Step 1: Clone element to preserve original
+      const clonedElement = element.cloneNode(true) as HTMLElement;
+      
+      // Step 2: Remove all Tailwind classes (prevents CSS parser conflicts)
+      clonedElement.querySelectorAll('*').forEach(el => {
+        (el as HTMLElement).removeAttribute('class');
+      });
 
-    // Simple approach: Convert to image and download as PNG
-    // For production, use jsPDF: import jsPDF from 'jspdf'; npm install jspdf
-    const link = document.createElement('a');
-    link.href = canvas.toDataURL('image/png');
-    link.download = `hoa-don-${donHang.maDonHang}.png`;
-    link.click();
+      // Step 3: Hide buttons and interactive elements
+      clonedElement.querySelectorAll('button').forEach(btn => {
+        (btn as HTMLElement).style.display = 'none';
+      });
 
-    // Better approach - uncomment after npm install jspdf html2canvas
-    /*
-    import html2canvas from 'html2canvas';
-    import jsPDF from 'jspdf';
+      // Step 4: Create temporary container with explicit styling
+      container = document.createElement('div');
+      container.style.position = 'fixed';
+      container.style.left = '-10000px';
+      container.style.top = '0';
+      container.style.width = '210mm';
+      container.style.height = 'auto';
+      container.style.backgroundColor = '#ffffff';
+      container.style.padding = '0';
+      container.style.margin = '0';
+      container.style.border = 'none';
+      container.style.boxSizing = 'border-box';
+      
+      container.appendChild(clonedElement);
+      document.body.appendChild(container);
 
-    html2canvas(element).then(canvas => {
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('portrait', 'mm', 'a4');
-      const imgWidth = 210; // A4 width in mm
+      // Step 5: Give browser time to render in new context
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Step 6: Render to canvas with proven options
+      const canvas = await html2canvas(clonedElement, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        windowWidth: 800,
+        windowHeight: clonedElement.scrollHeight,
+        ignoreElements: (el: Element) => {
+          return el.tagName === 'BUTTON';
+        }
+      });
+
+      // Step 7: Validate canvas
+      const imageData = canvas.toDataURL('image/png');
+      if (!imageData || imageData.length < 1000) {
+        throw new Error('Canvas rendering failed - image too small');
+      }
+
+      // Step 8: Create PDF with proper dimensions
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      // Step 9: Calculate dimensions
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const margin = 5;
+      const imgWidth = pdfWidth - 2 * margin;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+
+      // Step 10: Add image to PDF (handles pagination automatically)
+      pdf.addImage(imageData, 'PNG', margin, margin, imgWidth, imgHeight);
+
+      // Step 11: If multiple pages needed, add them
+      if (imgHeight > pdfHeight - 2 * margin) {
+        let remainingHeight = imgHeight - (pdfHeight - 2 * margin);
+        while (remainingHeight > 0) {
+          pdf.addPage();
+          pdf.addImage(imageData, 'PNG', margin, margin, imgWidth, imgHeight);
+          remainingHeight -= (pdfHeight - 2 * margin);
+        }
+      }
+
+      // Step 12: Direct download (NO print dialog)
       pdf.save(`hoa-don-${donHang.maDonHang}.pdf`);
-    });
-    */
+
+      // Step 13: Cleanup container
+      if (container && container.parentElement) {
+        document.body.removeChild(container);
+        container = null;
+      }
+    } catch (error) {
+      console.error('Invoice download error:', error);
+      
+      // Cleanup on error
+      if (container && container.parentElement) {
+        document.body.removeChild(container);
+      }
+
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      alert(
+        `Lỗi tải xuống hóa đơn: ${errorMsg}\n\n` +
+        `Vui lòng thử lại. Nếu lỗi vẫn tiếp tục, sử dụng nút "In hóa đơn" để lưu PDF.`
+      );
+    }
   };
 
   return (

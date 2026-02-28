@@ -257,6 +257,10 @@ function SanPhamForm({ editingSanPham, danhMuc, thuongHieu, onSave, onCancel }: 
       toast.error('Vui lòng điền tên và giá sản phẩm');
       return;
     }
+    if (!form.danhMucId) {
+      toast.error('Vui lòng chọn danh mục');
+      return;
+    }
     setSaving(true);
     try {
       const data: Record<string, unknown> = {
@@ -441,38 +445,73 @@ function SanPhamForm({ editingSanPham, danhMuc, thuongHieu, onSave, onCancel }: 
   // ======================== RENDER ========================
   if (loadingDetail) return <div className="bg-white rounded-xl border p-8 mb-6 text-center"><LoadingSpinner /></div>;
 
-  const renderBTSelects = (btForm: BienTheForm, setBTForm: (f: BienTheForm) => void) => (
-    <>
-      <select className="input-field text-sm" value={btForm.kichThuocId}
-        onChange={e => setBTForm({ ...btForm, kichThuocId: e.target.value })}>
-        <option value="">Kích thước</option>
-        {kichThuocOptions.map(k => <option key={k.id} value={k.id}>{k.kichCo}</option>)}
-      </select>
-      <select className="input-field text-sm" value={btForm.mauSacId}
-        onChange={e => setBTForm({ ...btForm, mauSacId: e.target.value })}>
-        <option value="">Màu sắc</option>
-        {mauSacOptions.map(m => (
-          <option key={m.id} value={m.id}>
-            {m.tenMau}
-          </option>
-        ))}
-      </select>
-      <select className="input-field text-sm" value={btForm.chatLieuId}
-        onChange={e => setBTForm({ ...btForm, chatLieuId: e.target.value })}>
-        <option value="">Chất liệu</option>
-        {chatLieuOptions.map(c => <option key={c.id} value={c.id}>{c.tenChatLieu}</option>)}
-      </select>
-      <input type="number" className="input-field text-sm" placeholder="Giá" value={btForm.gia}
-        onChange={e => setBTForm({ ...btForm, gia: e.target.value })} />
-      <input type="number" className="input-field text-sm" placeholder="Tồn kho" value={btForm.soLuongTon}
-        onChange={e => setBTForm({ ...btForm, soLuongTon: e.target.value })} />
-      <label className="flex items-center gap-1 text-xs whitespace-nowrap">
-        <input type="checkbox" checked={btForm.macDinh}
-          onChange={e => setBTForm({ ...btForm, macDinh: e.target.checked })} />
-        Mặc định
-      </label>
-    </>
-  );
+  // Get available sizes for selected color
+  const getAvailableSizesForColor = (colorId: string): KichThuoc[] => {
+    if (!colorId) return kichThuocOptions; // Show all sizes if no color selected
+    
+    // Get all variants with this color
+    const variantsWithColor = bienTheList.filter(bt => 
+      bt.mauSac?.id === Number(colorId)
+    );
+    
+    // Extract unique size IDs from those variants
+    const sizeIds = new Set(variantsWithColor.map(bt => bt.kichThuoc?.id).filter(Boolean));
+    
+    // Filter options to only show available sizes
+    if (sizeIds.size === 0) return kichThuocOptions; // If no variants, show all
+    return kichThuocOptions.filter(k => sizeIds.has(k.id));
+  };
+
+  const renderBTSelects = (btForm: BienTheForm, setBTForm: (f: BienTheForm) => void) => {
+    const availableSizes = getAvailableSizesForColor(btForm.mauSacId);
+    
+    return (
+      <>
+        <select className="input-field text-sm" value={btForm.kichThuocId}
+          onChange={e => setBTForm({ ...btForm, kichThuocId: e.target.value })}>
+          <option value="">Kích thước</option>
+          {kichThuocOptions.map(k => (
+            <option key={k.id} value={k.id} disabled={btForm.mauSacId ? !availableSizes.some(as => as.id === k.id) : false}>
+              {k.kichCo}
+            </option>
+          ))}
+        </select>
+        <select className="input-field text-sm" value={btForm.mauSacId}
+          onChange={e => {
+            const newMauSacId = e.target.value;
+            const newAvailableSizes = getAvailableSizesForColor(newMauSacId);
+            
+            // Reset size if current size not available for new color
+            const newKichThuocId = btForm.kichThuocId && newAvailableSizes.some(k => String(k.id) === btForm.kichThuocId)
+              ? btForm.kichThuocId
+              : '';
+            
+            setBTForm({ ...btForm, mauSacId: newMauSacId, kichThuocId: newKichThuocId });
+          }}>
+          <option value="">Màu sắc</option>
+          {mauSacOptions.map(m => (
+            <option key={m.id} value={m.id}>
+              {m.tenMau}
+            </option>
+          ))}
+        </select>
+        <select className="input-field text-sm" value={btForm.chatLieuId}
+          onChange={e => setBTForm({ ...btForm, chatLieuId: e.target.value })}>
+          <option value="">Chất liệu</option>
+          {chatLieuOptions.map(c => <option key={c.id} value={c.id}>{c.tenChatLieu}</option>)}
+        </select>
+        <input type="number" className="input-field text-sm" placeholder="Giá" value={btForm.gia}
+          onChange={e => setBTForm({ ...btForm, gia: e.target.value })} />
+        <input type="number" className="input-field text-sm" placeholder="Tồn kho" value={btForm.soLuongTon}
+          onChange={e => setBTForm({ ...btForm, soLuongTon: e.target.value })} />
+        <label className="flex items-center gap-1 text-xs whitespace-nowrap">
+          <input type="checkbox" checked={btForm.macDinh}
+            onChange={e => setBTForm({ ...btForm, macDinh: e.target.checked })} />
+          Mặc định
+        </label>
+      </>
+    );
+  };
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-6 mb-6 space-y-6">
@@ -493,9 +532,9 @@ function SanPhamForm({ editingSanPham, danhMuc, thuongHieu, onSave, onCancel }: 
               onChange={e => setForm({ ...form, giaGoc: e.target.value })} required />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Danh mục</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Danh mục *</label>
             <select className="input-field" value={form.danhMucId}
-              onChange={e => setForm({ ...form, danhMucId: e.target.value })}>
+              onChange={e => setForm({ ...form, danhMucId: e.target.value })} required>
               <option value="">-- Chọn --</option>
               {danhMuc.map(dm => <option key={dm.id} value={dm.id}>{dm.tenDanhMuc}</option>)}
             </select>
@@ -659,7 +698,7 @@ function SanPhamForm({ editingSanPham, danhMuc, thuongHieu, onSave, onCancel }: 
           <>
             <button type="button" onClick={() => setBulkMode(!bulkMode)}
               className="btn-secondary text-xs mb-3 px-3 py-1.5 flex items-center gap-1">
-              <Plus className="w-3 h-3" /> Thêm bulk ({bulkBTList.length})
+              <Plus className="w-3 h-3" /> Thêm nhiều ({bulkBTList.length})
             </button>
 
             {bulkMode && (
