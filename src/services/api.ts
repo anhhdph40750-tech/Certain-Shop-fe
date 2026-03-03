@@ -485,7 +485,7 @@ export const adminApi = {
   /** GET /quan-ly/nguoi-dung → { nguoiDung, tongSo, tongTrang, trang }
    *  Serialize từ NguoiDung entity: id, tenDangNhap, hoTen, email, soDienThoai, trangThai, dangHoatDong, thoiGianTao, vaiTro{id,tenVaiTro}
    */
-  danhSachNguoiDung: (params?: { tuKhoa?: string; trang?: number }) =>
+  danhSachNguoiDung: (params?: { tuKhoa?: string; trang?: number; tenVaiTro?: string }) =>
     api.get<ApiResponse<{ nguoiDung: NguoiDungAdmin[]; tongSo: number; tongTrang: number }>>('/quan-ly/nguoi-dung', { params }),
 
   /** PUT /quan-ly/nguoi-dung/{id}/trang-thai — body: { dangHoatDong: boolean } */

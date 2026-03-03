@@ -13,17 +13,18 @@ export default function QuanLyNguoiDungPage() {
   const [tuKhoa, setTuKhoa] = useState('');
   const [trang, setTrang] = useState(0);
   const [tongTrang, setTongTrang] = useState(0);
+  const [tabVaiTro, setTabVaiTro] = useState<string>('');
   const { isAdmin } = useAuthStore();
 
   const load = useCallback(() => {
     setLoading(true);
-    adminApi.danhSachNguoiDung({ tuKhoa: tuKhoa || undefined, trang })
+    adminApi.danhSachNguoiDung({ tuKhoa: tuKhoa || undefined, trang, tenVaiTro: tabVaiTro || undefined })
       .then(r => {
         setDanhSach(r.data.duLieu?.nguoiDung || []);
         setTongTrang(r.data.duLieu?.tongTrang || 0);
       })
       .finally(() => setLoading(false));
-  }, [tuKhoa, trang]);
+  }, [tuKhoa, trang, tabVaiTro]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -49,22 +50,43 @@ export default function QuanLyNguoiDungPage() {
 
   const vaiTroLabel = (vt: NguoiDungAdmin['vaiTro']) => {
     const ten = vt?.tenVaiTro || '';
-    if (ten === 'Admin') return <span className="badge badge-red text-xs">Admin</span>;
-    if (ten === 'Nhân viên') return <span className="badge badge-blue text-xs">Nhân viên</span>;
-    return <span className="badge badge-gray text-xs">Khách hàng</span>;
+    if (ten === 'ADMIN') return <span className="badge badge-red text-xs">Admin</span>;
+    if (ten === 'NHAN_VIEN') return <span className="badge badge-blue text-xs">Nhân viên</span>;
+    if (ten === 'KHACH_HANG') return <span className="badge badge-gray text-xs">Khách hàng</span>;
+    return <span className="badge badge-gray text-xs">{ten || 'Không xác định'}</span>;
   };
 
   const getTenVaiTro = (u: NguoiDungAdmin) => u.vaiTro?.tenVaiTro || '';
+
 
   return (
     <div>
       <h2 className="text-xl font-bold text-gray-900 mb-6">Quản lý người dùng</h2>
 
-      <div className="bg-white rounded-xl border border-gray-100 p-4 mb-5">
+      <div className="bg-white rounded-xl border border-gray-100 p-4 mb-5 flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="relative max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input className="input-field pl-9 text-sm" placeholder="Tìm tên, email, SĐT..."
             value={tuKhoa} onChange={e => { setTuKhoa(e.target.value); setTrang(0); }} />
+        </div>
+        <div className="flex items-center gap-1 ml-auto">
+          {[
+            { label: 'Tất cả', value: '' },
+            { label: 'Khách hàng', value: 'KHACH_HANG' },
+            { label: 'Nhân viên', value: 'NHAN_VIEN' },
+          ].map(tab => (
+            <button
+              key={tab.value}
+              onClick={() => { setTabVaiTro(tab.value); setTrang(0); }}
+              className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
+                tabVaiTro === tab.value
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -116,14 +138,14 @@ export default function QuanLyNguoiDungPage() {
                           className="p-1.5 text-gray-400 hover:text-indigo-600 transition-colors">
                           {u.dangHoatDong ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
                         </button>
-                        {getTenVaiTro(u) === 'Khách hàng' && (
+                        {getTenVaiTro(u) === 'KHACH_HANG' && (
                           <button onClick={() => doiVaiTro(u.id, 2)}
                             title="Thăng lên Nhân viên"
                             className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors">
                             <Shield className="w-4 h-4" />
                           </button>
                         )}
-                        {getTenVaiTro(u) === 'Nhân viên' && (
+                        {getTenVaiTro(u) === 'NHAN_VIEN' && (
                           <button onClick={() => doiVaiTro(u.id, 3)}
                             title="Hạ xuống Khách hàng"
                             className="text-xs px-2 py-1 text-red-500 hover:bg-red-50 rounded transition-colors">

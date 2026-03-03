@@ -12,6 +12,18 @@ interface AuthState {
   isNhanVien: () => boolean;
 }
 
+// Enterprise pattern: force login on new browser session.
+// localStorage keeps state across page refreshes (good UX),
+// but a sessionStorage flag detects when the browser was fully closed.
+// On new browser session: flag is absent → clear auth → force login.
+// On page refresh: flag exists → auth is valid → stay logged in.
+const SESSION_FLAG = 'app-session-active';
+const isNewBrowserSession = !sessionStorage.getItem(SESSION_FLAG);
+if (isNewBrowserSession) {
+  localStorage.removeItem('auth-storage');
+  sessionStorage.setItem(SESSION_FLAG, '1');
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
