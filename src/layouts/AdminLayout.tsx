@@ -8,7 +8,7 @@ import { useAuthStore } from '../stores/authStore';
 
 const navItems = [
   { to: '/quan-ly', label: 'Thống kê', icon: LayoutDashboard, end: true },
-  { to: '/quan-ly/san-pham', label: 'Sản phẩm', icon: Package },
+  { to: '/quan-ly/san-pham', label: 'Sản phẩm t', icon: Package },
   { to: '/quan-ly/don-hang', label: 'Đơn hàng', icon: ShoppingCart },
   { to: '/quan-ly/nguoi-dung', label: 'Nhân viên', icon: Users },
   { to: '/quan-ly/thuoc-tinh', label: 'Thuộc tính', icon: Tags },
