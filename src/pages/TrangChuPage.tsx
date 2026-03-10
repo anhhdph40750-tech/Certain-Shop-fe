@@ -67,7 +67,6 @@ export default function TrangChuPage() {
           {[
             { icon: <Truck className="w-6 h-6" />, title: 'Giao hàng nhanh', desc: 'Trong 2-3 ngày' },
             { icon: <Shield className="w-6 h-6" />, title: 'Đảm bảo chất lượng', desc: 'Hàng chính hãng' },
-            { icon: <RefreshCw className="w-6 h-6" />, title: 'Đổi trả dễ dàng', desc: '30 ngày đổi trả' },
             { icon: <Headphones className="w-6 h-6" />, title: 'Uy tín tạo niềm tin', desc: '5 sao' },
           ].map((f, i) => (
             <div key={i} className="flex items-center gap-3">
