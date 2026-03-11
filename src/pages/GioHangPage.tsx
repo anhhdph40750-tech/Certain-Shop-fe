@@ -64,9 +64,10 @@ export default function GioHangPage() {
       setUpdating(null);
     }
   };
-
-  // fallback when server returns zero price
-  const getDonGia = (ct: GioHang['danhSachChiTiet'][0]) => ct.donGia || ct.bienThe?.gia || 0;
+const getDonGia = (ct: GioHang['danhSachChiTiet'][0]) => {
+  console.log("bienThe object:", ct.bienThe);
+  return ct.bienThe?.gia || 1000;
+};
   const getThanhTien = (ct: GioHang['danhSachChiTiet'][0]) => getDonGia(ct) * ct.soLuong;
   const tongTien =
     gioHang?.danhSachChiTiet?.reduce((sum, ct) => sum + getThanhTien(ct), 0) || 0;

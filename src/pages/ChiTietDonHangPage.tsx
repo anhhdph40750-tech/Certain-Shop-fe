@@ -182,17 +182,17 @@ export default function ChiTietDonHangPage() {
 
           {/* Actions */}
           <div className="space-y-2">
-          
-            {donHang.trangThaiDonHang === 'CHO_XAC_NHAN' && (
-              <button onClick={huyDon} disabled={huyLoading}
-                className="btn-danger w-full">
+            {(
+              donHang.trangThaiDonHang === 'CHO_XAC_NHAN' ||
+              donHang.trangThaiDonHang === 'DA_XAC_NHAN' ||
+              donHang.trangThaiDonHang === 'DANG_XU_LY'
+            ) && (
+              <button
+                onClick={huyDon}
+                disabled={huyLoading}
+                className="btn-danger w-full"
+              >
                 {huyLoading ? 'Đang hủy...' : 'Hủy đơn hàng'}
-              </button>
-            )}
-            {donHang.trangThaiDonHang === 'DANG_GIAO' && (
-              <button onClick={xacNhanNhanHang} disabled={xacNhanLoading}
-                className="btn-primary w-full">
-                {xacNhanLoading ? 'Đang xử lý...' : 'Đã nhận được hàng'}
               </button>
             )}
           </div>

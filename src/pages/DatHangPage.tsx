@@ -312,7 +312,7 @@ export default function DatHangPage() {
 
             <div className="space-y-3 mb-4 max-h-60 overflow-y-auto">
               {gioHang?.danhSachChiTiet?.map(ct => {
-                const donGia = ct.donGia || ct.bienThe?.gia || 0;
+                const donGia =  ct.bienThe?.gia || 0;
                 const thanhTien = donGia * ct.soLuong;
                 return (
                   <div key={ct.id} className="flex gap-3">
