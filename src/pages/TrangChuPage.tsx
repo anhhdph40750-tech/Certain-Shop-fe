@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Truck, Shield, RefreshCw, Headphones, AlertCircle } from 'lucide-react';
+import { ArrowRight, Truck, Shield, RefreshCw, Headphones } from 'lucide-react';
 import { sanPhamApi } from '../services/api';
 import type { SanPhamItem, DanhMuc } from '../services/api';
 import ProductCard from '../components/ProductCard';
@@ -11,92 +11,83 @@ export default function TrangChuPage() {
   const [sanPhamMoi, setSanPhamMoi] = useState<SanPhamItem[]>([]);
   const [danhMuc, setDanhMuc] = useState<DanhMuc[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadData();
+    Promise.all([
+      sanPhamApi.banChay(),
+      sanPhamApi.moi(),
+      sanPhamApi.danhMuc(),
+    ]).then(([banChay, moi, dm]) => {
+      setSanPhamBanChay(banChay.data.duLieu || []);
+      setSanPhamMoi(moi.data.duLieu || []);
+      setDanhMuc(dm.data.duLieu || []);
+    }).finally(() => setLoading(false));
   }, []);
-
-  const loadData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [banChayRes, moiRes, dmRes] = await Promise.all([
-        sanPhamApi.banChay().catch(err => {
-          console.error('Failed to load best sellers:', err);
-          return { data: { duLieu: [] } };
-        }),
-        sanPhamApi.moi().catch(err => {
-          console.error('Failed to load new products:', err);
-          return { data: { duLieu: [] } };
-        }),
-        sanPhamApi.danhMuc().catch(err => {
-          console.error('Failed to load categories:', err);
-          return { data: { duLieu: [] } };
-        })
-      ]);
-      
-      setSanPhamBanChay(banChayRes?.data?.duLieu || []);
-      setSanPhamMoi(moiRes?.data?.duLieu || []);
-      setDanhMuc(dmRes?.data?.duLieu || []);
-    } catch (err) {
-      console.error('Error loading homepage data:', err);
-      setError('Có lỗi khi tải dữ liệu. Vui lòng thử lại.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (loading) return <LoadingSpinner fullPage />;
 
-  if (error) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 py-16 text-center">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-4">
-          <AlertCircle className="w-8 h-8 text-red-600" />
-        </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Lỗi khi tải trang</h2>
-        <p className="text-gray-600 mb-8">{error}</p>
-        <button
-          onClick={loadData}
-          className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors"
-        >
-          Thử lại
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div>
+    <div className="bg-gray-50">
       {/* Hero Banner */}
-      <section className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 text-white">
-        <div className="max-w-7xl mx-auto px-4 py-20 flex flex-col lg:flex-row items-center gap-12">
+      <section className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-800 to-blue-700 text-white">
+        {/* Background blobs */}
+        <div className="pointer-events-none absolute -top-24 -left-24 w-96 h-96 bg-white/10 blur-3xl rounded-full" />
+        <div className="pointer-events-none absolute -bottom-24 -right-24 w-[28rem] h-[28rem] bg-sky-300/10 blur-3xl rounded-full" />
+
+        <div className="max-w-7xl mx-auto px-4 py-16 md:py-20 flex flex-col lg:flex-row items-center gap-12">
           <div className="flex-1 text-center lg:text-left">
-            <span className="inline-block bg-indigo-500 px-3 py-1 rounded-full text-xs font-semibold mb-4 tracking-wider uppercase">
-              Bộ sưu tập 2025
+            <span className="inline-flex items-center gap-2 bg-white/10 border border-white/15 px-3 py-1 rounded-full text-xs font-semibold mb-5 tracking-wider uppercase">
+              Bộ sưu tập mới
+              <span className="w-1 h-1 rounded-full bg-yellow-300" />
+              2026
             </span>
-            <h1 className="text-4xl lg:text-6xl font-bold leading-tight mb-4">
-              Phong cách<br />
-              <span className="text-yellow-300">hiện đại</span>
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight mb-5">
+              Nâng tầm phong cách
+              <span className="block text-yellow-300">mỗi ngày</span>
             </h1>
-            <p className="text-indigo-200 text-lg mb-8 max-w-md">
-              Khám phá bộ sưu tập áo phong phong mới nhất. Chất liệu cao cấp, thiết kế tinh tế.
+            <p className="text-white/80 text-base md:text-lg mb-8 max-w-xl mx-auto lg:mx-0">
+              Chất liệu cao cấp, form đẹp, dễ phối đồ. Khám phá ngay những mẫu mới nhất tại CertainShop.
             </p>
-            <div className="flex gap-4 justify-center lg:justify-start">
-              <Link to="/san-pham" className="bg-white text-indigo-600 px-6 py-3 rounded-xl font-semibold hover:bg-indigo-50 transition-colors flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
+              <Link
+                to="/san-pham"
+                className="bg-white text-indigo-700 px-6 py-3 rounded-xl font-semibold hover:bg-indigo-50 transition-colors inline-flex items-center justify-center gap-2 shadow-sm"
+              >
                 Mua sắm ngay <ArrowRight className="w-4 h-4" />
               </Link>
-              <Link to="/san-pham?moi=true" className="border border-white px-6 py-3 rounded-xl font-semibold hover:bg-white/10 transition-colors">
-                Hàng mới về
+              <Link
+                to="/san-pham?moi=true"
+                className="border border-white/40 bg-white/5 px-6 py-3 rounded-xl font-semibold hover:bg-white/10 transition-colors inline-flex items-center justify-center"
+              >
+                Xem hàng mới
               </Link>
             </div>
+            <div className="mt-8 flex items-center justify-center lg:justify-start gap-4 text-xs text-white/75">
+              <span className="inline-flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-300" /> Hàng có sẵn
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-sky-300" /> Đổi trả dễ
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-300" /> Ship nhanh
+              </span>
+            </div>
           </div>
-          <div className="flex-1 flex justify-center">
-            <div className="w-80 h-80 lg:w-96 lg:h-96 bg-indigo-500/30 rounded-full flex items-center justify-center">
-              <img src="/hero-shirt.png" alt="Fashion" className="w-64 h-64 lg:w-80 lg:h-80 object-contain"
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-              <div className="text-8xl" style={{ display: 'none' }}>👕</div>
+
+          <div className="flex-1 flex justify-center w-full">
+            <div className="relative w-80 h-80 lg:w-[26rem] lg:h-[26rem]">
+              <div className="absolute inset-0 rounded-[2.5rem] bg-white/10 border border-white/15 backdrop-blur-sm shadow-2xl rotate-3" />
+              <div className="absolute inset-0 rounded-[2.5rem] bg-gradient-to-br from-white/10 to-white/0 border border-white/10 -rotate-2" />
+              <div className="relative w-full h-full rounded-[2.5rem] flex items-center justify-center">
+                <img
+                  src="/hero-shirt.png"
+                  alt="Fashion"
+                  className="w-72 h-72 lg:w-96 lg:h-96 object-contain drop-shadow-[0_30px_35px_rgba(0,0,0,0.25)]"
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+                <div className="text-8xl" style={{ display: 'none' }}>👕</div>
+              </div>
             </div>
           </div>
         </div>
@@ -104,15 +95,15 @@ export default function TrangChuPage() {
 
       {/* Features */}
       <section className="bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div className="max-w-7xl mx-auto px-4 py-10 grid grid-cols-2 md:grid-cols-4 gap-6">
           {[
             { icon: <Truck className="w-6 h-6" />, title: 'Giao hàng nhanh', desc: 'Trong 2-3 ngày' },
             { icon: <Shield className="w-6 h-6" />, title: 'Đảm bảo chất lượng', desc: 'Hàng chính hãng' },
             { icon: <RefreshCw className="w-6 h-6" />, title: 'Đổi trả dễ dàng', desc: '30 ngày đổi trả' },
-            { icon: <Headphones className="w-6 h-6" />, title: 'Hỗ trợ 24/7', desc: 'Luôn sẵn sàng' },
+            { icon: <Headphones className="w-6 h-6" />, title: 'Uy tín tạo niềm tin', desc: '5 sao' },
           ].map((f, i) => (
-            <div key={i} className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0">
+            <div key={i} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-gray-50 transition-colors">
+              <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center flex-shrink-0">
                 {f.icon}
               </div>
               <div>
@@ -124,28 +115,58 @@ export default function TrangChuPage() {
         </div>
       </section>
 
-      {/* Categories */}
+      {/* Danh mục */}
       {danhMuc.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 py-12">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Danh mục</h2>
-            <Link to="/san-pham" className="text-indigo-600 text-sm flex items-center gap-1 hover:underline">
+          <div className="flex items-end justify-between gap-4 mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Danh mục</h2>
+              <p className="text-sm text-gray-500 mt-1">Chọn nhanh theo nhu cầu của bạn</p>
+            </div>
+            <Link to="/san-pham" className="text-indigo-600 text-sm font-medium inline-flex items-center gap-1 hover:underline">
               Xem tất cả <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {danhMuc.slice(0, 6).map(dm => (
               <Link key={dm.id} to={`/danh-muc/${dm.duongDan}`}
-                className="group flex flex-col items-center gap-2 p-4 bg-white rounded-2xl border border-gray-100 hover:border-indigo-200 hover:shadow-md transition-all">
-                <div className="w-16 h-16 bg-indigo-50 group-hover:bg-indigo-100 rounded-2xl flex items-center justify-center text-2xl transition-colors">
-                  👕
+                className="group bg-white rounded-2xl border border-gray-100 hover:border-indigo-200 hover:shadow-md transition-all overflow-hidden">
+                <div className="p-4 flex items-center gap-3">
+                  <div className="w-12 h-12 bg-indigo-50 group-hover:bg-indigo-100 rounded-2xl flex items-center justify-center text-xl transition-colors">
+                    👕
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-gray-900 truncate">{dm.tenDanhMuc}</div>
+                    <div className="text-xs text-gray-500">Khám phá ngay</div>
+                  </div>
                 </div>
-                <span className="text-sm font-medium text-gray-700 text-center">{dm.tenDanhMuc}</span>
               </Link>
             ))}
           </div>
         </section>
       )}
+
+      {/* Promo banner */}
+      <section className="max-w-7xl mx-auto px-4 pb-2">
+        <div className="relative overflow-hidden bg-gradient-to-r from-indigo-700 via-blue-700 to-sky-600 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-5 shadow-sm">
+          <div className="pointer-events-none absolute -top-16 -right-16 w-72 h-72 bg-white/10 blur-3xl rounded-full" />
+          <div className="pointer-events-none absolute -bottom-20 -left-20 w-80 h-80 bg-sky-300/10 blur-3xl rounded-full" />
+          <div>
+            <div className="inline-flex items-center gap-2 bg-white/15 border border-white/15 text-white px-3 py-1 rounded-full text-xs font-semibold">
+              Ưu đãi tuần này
+            </div>
+            <h3 className="text-2xl md:text-3xl font-extrabold text-white mt-2">
+              Giảm giá hấp dẫn cho sản phẩm chọn lọc
+            </h3>
+            <p className="text-white/90 mt-1">
+              Số lượng có hạn — đặt sớm để nhận ưu đãi tốt nhất.
+            </p>
+          </div>
+          <Link to="/san-pham" className="bg-white text-indigo-700 px-6 py-3 rounded-xl font-semibold hover:bg-indigo-50 transition-colors whitespace-nowrap">
+            Xem ngay
+          </Link>
+        </div>
+      </section>
 
       {/* New Products */}
       {sanPhamMoi.length > 0 && (
@@ -168,7 +189,7 @@ export default function TrangChuPage() {
       )}
 
       {/* Banner */}
-      <section className="max-w-7xl mx-auto px-4 py-8">
+      {/* <section className="max-w-7xl mx-auto px-4 py-8">
         <div className="bg-gradient-to-r from-amber-400 to-orange-500 rounded-2xl p-8 md:p-12 flex flex-col md:flex-row items-center justify-between gap-6">
           <div>
             <h3 className="text-2xl md:text-3xl font-bold text-white mb-2">Ưu đãi đặc biệt</h3>
@@ -178,7 +199,7 @@ export default function TrangChuPage() {
             Xem ngay
           </Link>
         </div>
-      </section>
+      </section> */}
 
       {/* Best sellers */}
       {sanPhamBanChay.length > 0 && (

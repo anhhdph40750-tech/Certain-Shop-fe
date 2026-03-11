@@ -19,21 +19,21 @@ export default function Footer() {
           </div>
 
           {/* Links */}
-          <div>
+          <div> 
             <h3 className="font-semibold text-white mb-3">Sản phẩm</h3>
             <ul className="space-y-2 text-sm">
-              <li><Link to="/san-pham" className="hover:text-white transition-colors">Tất cả sản phẩm</Link></li>
-              <li><Link to="/danh-muc/ao" className="hover:text-white transition-colors">Áo</Link></li>
-              <li><Link to="/danh-muc/quan" className="hover:text-white transition-colors">Quần</Link></li>
+              <li><p  >Chất Lượng 5 sao</p></li>
+              <li><p >Yên tâm mua sắm</p></li>
+          
             </ul>
           </div>
 
           <div>
             <h3 className="font-semibold text-white mb-3">Hỗ trợ</h3>
             <ul className="space-y-2 text-sm">
-              <li><a href="#" className="hover:text-white transition-colors">Chính sách đổi trả</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Hướng dẫn mua hàng</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Liên hệ</a></li>
+              <li><p >Chính sách đổi trả</p></li>
+              <li><p >Hướng dẫn mua hàng</p></li>
+              <li><p >Liên hệ</p></li>
             </ul>
           </div>
 

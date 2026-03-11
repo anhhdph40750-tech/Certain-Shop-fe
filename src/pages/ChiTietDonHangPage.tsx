@@ -80,7 +80,7 @@ export default function ChiTietDonHangPage() {
       </div>
 
       {/* Progress tracker */}
-      {!isHuy && currentStep >= 0 && (
+      {/* {!isHuy && currentStep >= 0 && (
         <div className="bg-white rounded-xl border border-gray-100 p-6 mb-6">
           <div className="flex items-center">
             {steps.map((step, idx) => {
@@ -103,7 +103,7 @@ export default function ChiTietDonHangPage() {
             })}
           </div>
         </div>
-      )}
+      )} */}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Left */}
@@ -139,28 +139,7 @@ export default function ChiTietDonHangPage() {
           </div>
 
           {/* Status history */}
-          {donHang.lichSuTrangThai && donHang.lichSuTrangThai.length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-100 p-6">
-              <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Clock className="w-4 h-4" /> Lịch sử trạng thái
-              </h2>
-              <div className="space-y-3">
-                {donHang.lichSuTrangThai.map((ls, idx) => {
-                  const s = trangThaiDonHangLabel[ls.trangThai];
-                  return (
-                    <div key={idx} className="flex items-start gap-3">
-                      <div className="w-2 h-2 rounded-full bg-indigo-400 mt-2 shrink-0" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">{s?.label || ls.trangThai}</p>
-                        {ls.ghiChu && <p className="text-xs text-gray-500">{ls.ghiChu}</p>}
-                        <p className="text-xs text-gray-400">{formatDate(ls.thoiGianTao)}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          
         </div>
 
         {/* Right */}
@@ -198,17 +177,12 @@ export default function ChiTietDonHangPage() {
                 <span className="text-indigo-600">{formatCurrency(donHang.tongTienThanhToan)}</span>
               </div>
             </div>
-            <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500">
-              <p>PT thanh toán: {donHang.phuongThucThanhToan === 'COD' ? 'Tiền mặt (COD)' : 'VNPay'}</p>
-              <p>Trạng thái: {donHang.daThanhToan ? '✓ Đã thanh toán' : 'Chưa thanh toán'}</p>
-            </div>
+          
           </div>
 
           {/* Actions */}
           <div className="space-y-2">
-            <button onClick={() => setShowPrint(true)} className="btn-secondary w-full">
-              🖨️ In hóa đơn
-            </button>
+          
             {donHang.trangThaiDonHang === 'CHO_XAC_NHAN' && (
               <button onClick={huyDon} disabled={huyLoading}
                 className="btn-danger w-full">

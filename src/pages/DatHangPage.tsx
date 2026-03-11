@@ -260,35 +260,8 @@ export default function DatHangPage() {
             )}
 
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-1 block">
-                    Họ tên người nhận *
-                    {!isValidName(tenNguoiNhan) && tenNguoiNhan && (
-                      <span className="text-red-500 text-xs ml-1">Không hợp lệ</span>
-                    )}
-                  </label>
-                  <input value={tenNguoiNhan} onChange={e => setTenNguoiNhan(e.target.value)} 
-                    className={`input-field ${!isValidName(tenNguoiNhan) && tenNguoiNhan ? 'border-red-400' : ''}`}
-                    placeholder="Ít nhất 3 ký tự" />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-1 block">
-                    Số điện thoại *
-                    {!isValidPhoneNumber(sdtNguoiNhan) && sdtNguoiNhan && (
-                      <span className="text-red-500 text-xs ml-1">Không hợp lệ</span>
-                    )}
-                  </label>
-                  <input value={sdtNguoiNhan} onChange={e => setSdtNguoiNhan(e.target.value)} 
-                    className={`input-field ${!isValidPhoneNumber(sdtNguoiNhan) && sdtNguoiNhan ? 'border-red-400' : ''}`}
-                    placeholder="10-11 chữ số" />
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-1 block">Địa chỉ giao hàng *</label>
-                <textarea value={diaChiGiaoHang} onChange={e => setDiaChiGiaoHang(e.target.value)}
-                  className="input-field resize-none" rows={2} />
-              </div>
+              
+            
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-1 block">Ghi chú đơn hàng</label>
                 <textarea value={ghiChu} onChange={e => setGhiChu(e.target.value)}
@@ -303,7 +276,7 @@ export default function DatHangPage() {
             <div className="space-y-2">
               {[
                 { value: 'COD', label: '💵 Thanh toán khi nhận hàng (COD)' },
-                { value: 'VNPAY', label: '💳 Thanh toán qua VNPay' },
+              
               ].map(pt => (
                 <label key={pt.value}
                   className={`flex gap-3 p-4 rounded-lg border cursor-pointer transition-all ${phuongThuc === pt.value ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}>
@@ -316,7 +289,7 @@ export default function DatHangPage() {
           </div>
 
           {/* Voucher code */}
-          <div className="bg-white rounded-xl border border-gray-100 p-6">
+          {/* <div className="bg-white rounded-xl border border-gray-100 p-6">
             <h2 className="font-bold text-gray-900 mb-4">Mã voucher</h2>
             <div className="flex gap-3">
               <input value={maVoucher} onChange={e => setMaVoucher(e.target.value.toUpperCase())}
@@ -329,7 +302,7 @@ export default function DatHangPage() {
                 <p className="text-green-600 text-sm">Giảm: {formatCurrency(voucherInfo.giaTriGiam)}</p>
               </div>
             )}
-          </div>
+          </div> */}
         </div>
 
         {/* Right - Summary */}

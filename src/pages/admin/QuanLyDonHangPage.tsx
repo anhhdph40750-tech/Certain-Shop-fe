@@ -166,12 +166,7 @@ export default function QuanLyDonHangPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => xemChiTiet(dh.maDonHang)}
-                          className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
-                          title="Xem chi tiết">
-                          <Eye className="w-4 h-4" />
-                        </button>
+                       
                         {nextLabel && (
                           <button
                             onClick={() => chuyenTrangThai(dh.maDonHang, nextState)}
@@ -186,10 +181,7 @@ export default function QuanLyDonHangPage() {
                             Hủy
                           </button>
                         )}
-                        <button onClick={() => toggleExpand(dh.maDonHang)}
-                          className="p-1 text-gray-400 hover:text-gray-600">
-                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        </button>
+                       
                       </div>
                     </td>
                   </tr>
@@ -197,42 +189,7 @@ export default function QuanLyDonHangPage() {
               })}
 
               {/* Expanded detail rows */}
-              {danhSach.map(dh => {
-                const isExpanded = expanded === dh.maDonHang;
-                if (!isExpanded || !chiTietDonHang) return null;
-                return (
-                  <tr key={`detail-${dh.maDonHang}`}>
-                    <td colSpan={6} className="p-0">
-                      <div className="bg-gray-50 px-6 py-4 border-t border-gray-100">
-                        <div className="text-xs text-gray-600 space-y-1 mb-3">
-                          <p><span className="font-medium">Địa chỉ: </span>{chiTietDonHang.diaChiGiaoHang}</p>
-                          <p><span className="font-medium">Ghi chú: </span>{chiTietDonHang.ghiChu || '—'}</p>
-                          <p><span className="font-medium">Thanh toán: </span>{chiTietDonHang.phuongThucThanhToan} · {chiTietDonHang.daThanhToan ? '✓ Đã TT' : 'Chưa TT'}</p>
-                        </div>
-                        <div className="space-y-2">
-                          {chiTietDonHang.danhSachChiTiet?.map(ct => {
-                            const donGia = ct.giaTaiThoiDiemMua || 0;
-                            const displayThanhTien = ct.thanhTien || donGia * ct.soLuong;
-                            return (
-                              <div key={ct.id} className="flex items-center gap-3 text-xs">
-                                <img src={getImageUrl(ct.bienThe?.anhChinh)} alt=""
-                                  className="w-10 h-10 rounded object-cover bg-white border"
-                                  onError={handleImgError} />
-                                <span className="font-medium text-gray-800 flex-1">{ct.bienThe?.tenSanPham}</span>
-                                <span className="text-gray-500">
-                                  {[ct.bienThe?.tenMauSac, ct.bienThe?.kichThuoc].filter(Boolean).join(' / ')}
-                                </span>
-                                <span className="text-gray-500">×{ct.soLuong}</span>
-                                <span className="font-semibold text-gray-700">{formatCurrency(displayThanhTien)}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+              
               {danhSach.length === 0 && (
                 <tr><td colSpan={6} className="text-center py-10 text-gray-400">Không có đơn hàng</td></tr>
               )}

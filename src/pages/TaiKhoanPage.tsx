@@ -25,7 +25,7 @@ export default function TaiKhoanPage() {
   const tabs = [
     { id: 'profile' as Tab, label: 'Thông tin', icon: User },
     { id: 'addresses' as Tab, label: 'Địa chỉ', icon: MapPin },
-    { id: 'password' as Tab, label: 'Mật khẩu', icon: Lock },
+   
   ];
 
   return (
@@ -46,7 +46,7 @@ export default function TaiKhoanPage() {
         <div className="flex-1">
           {activeTab === 'profile' && <ProfileTab user={user} setAuth={setAuth} />}
           {activeTab === 'addresses' && <AddressesTab />}
-          {activeTab === 'password' && <PasswordTab />}
+        
         </div>
       </div>
     </div>
@@ -80,7 +80,7 @@ function ProfileTab({ setAuth }: { user: UserType | null; setAuth: (token: strin
     }
     // Validate phone if provided
     if (form.soDienThoai && !isValidPhoneNumber(form.soDienThoai)) {
-      toast.error('Số điện thoại không hợp lệ (10-11 chữ số)');
+      toast.error('Số điện thoại không hợp lệ');
       return;
     }
     // Validate name
@@ -394,53 +394,4 @@ function AddressForm({ initial, onSave, onCancel }: { initial: DiaChi | null; on
   );
 }
 
-function PasswordTab() {
-  const [form, setForm] = useState({ matKhauCu: '', matKhauMoi: '', xacNhan: '' });
-  const [saving, setSaving] = useState(false);
 
-  const save = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (form.matKhauMoi !== form.xacNhan) {
-      toast.error('Mật khẩu xác nhận không khớp');
-      return;
-    }
-    if (form.matKhauMoi.length < 6) {
-      toast.error('Mật khẩu mới phải ít nhất 6 ký tự');
-      return;
-    }
-    setSaving(true);
-    try {
-      await taiKhoanApi.doiMatKhau(form.matKhauCu, form.matKhauMoi);
-      toast.success('Đổi mật khẩu thành công');
-      setForm({ matKhauCu: '', matKhauMoi: '', xacNhan: '' });
-    } catch {
-      toast.error('Mật khẩu cũ không đúng');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-100 p-6">
-      <h2 className="font-semibold text-gray-900 mb-6">Đổi mật khẩu</h2>
-      <form onSubmit={save} className="space-y-4 max-w-sm">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu hiện tại</label>
-          <input type="password" className="input-field" required value={form.matKhauCu}
-            onChange={e => setForm({ ...form, matKhauCu: e.target.value })} />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu mới</label>
-          <input type="password" className="input-field" required minLength={6} value={form.matKhauMoi}
-            onChange={e => setForm({ ...form, matKhauMoi: e.target.value })} />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Xác nhận mật khẩu mới</label>
-          <input type="password" className="input-field" required value={form.xacNhan}
-            onChange={e => setForm({ ...form, xacNhan: e.target.value })} />
-        </div>
-        <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Đang lưu...' : 'Đổi mật khẩu'}</button>
-      </form>
-    </div>
-  );
-}

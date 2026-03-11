@@ -29,7 +29,6 @@ import QuanLyDonHangPage from './pages/admin/QuanLyDonHangPage';
 import QuanLyNguoiDungPage from './pages/admin/QuanLyNguoiDungPage';
 import QuanLySanPhamPage from './pages/admin/QuanLySanPhamPage';
 import QuanLyThuocTinhPage from './pages/admin/QuanLyThuocTinhPage';
-import QuanLyVoucherPage from './pages/admin/QuanLyVoucherPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -78,7 +77,6 @@ export default function App() {
             <Route path="don-hang" element={<QuanLyDonHangPage />} />
             <Route path="nguoi-dung" element={<QuanLyNguoiDungPage />} />
             <Route path="thuoc-tinh" element={<QuanLyThuocTinhPage />} />
-            <Route path="voucher" element={<QuanLyVoucherPage />} />
           </Route>
         </Routes>
       </BrowserRouter>
