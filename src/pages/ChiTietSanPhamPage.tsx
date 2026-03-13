@@ -26,7 +26,6 @@ export default function ChiTietSanPhamPage() {
   // ── Selections (source of truth — never set from derived state) ──
   const [selectedColor, setSelectedColor] = useState<number | null>(null);
   const [selectedSize, setSelectedSize] = useState<number | null>(null);
-  const [selectedMaterial, setSelectedMaterial] = useState<number | null>(null);
 
   // ── Stable reference to variants (avoids spurious effect re-runs) ──
   const bienThe = useMemo(() => sanPham?.bienThe || [], [sanPham]);
@@ -38,18 +37,14 @@ export default function ChiTietSanPhamPage() {
   const sizes = useMemo(() =>
     [...new Map(bienThe.filter(bt => bt.kichThuoc).map(bt => [bt.kichThuoc!.id, bt.kichThuoc!])).values()],
     [bienThe]);
-  const materials = useMemo(() =>
-    [...new Map(bienThe.filter(bt => bt.chatLieu).map(bt => [bt.chatLieu!.id, bt.chatLieu!])).values()],
-    [bienThe]);
 
   // ── selectedBienThe is DERIVED — no circular setState loop ──
   const selectedBienThe = useMemo(() =>
     bienThe.find(bt =>
       (!selectedColor || bt.mauSac?.id === selectedColor) &&
-      (!selectedSize || bt.kichThuoc?.id === selectedSize) &&
-      (!selectedMaterial || bt.chatLieu?.id === selectedMaterial)
+      (!selectedSize || bt.kichThuoc?.id === selectedSize)
     ) ?? null,
-    [bienThe, selectedColor, selectedSize, selectedMaterial]);
+    [bienThe, selectedColor, selectedSize]);
 
   useEffect(() => {
     if (!duongDan) return;
@@ -62,7 +57,6 @@ export default function ChiTietSanPhamPage() {
       if (def) {
         setSelectedColor(def.mauSac?.id ?? null);
         setSelectedSize(def.kichThuoc?.id ?? null);
-        setSelectedMaterial(def.chatLieu?.id ?? null);
       }
       setSelectedAnh(0);
       setSoLuong(1);
@@ -111,11 +105,9 @@ export default function ChiTietSanPhamPage() {
   const hasVariant = (
     colorId: number | null,
     sizeId: number | null,
-    materialId: number | null,
   ) => bienThe.some(bt =>
     (!colorId || bt.mauSac?.id === colorId) &&
     (!sizeId || bt.kichThuoc?.id === sizeId) &&
-    (!materialId || bt.chatLieu?.id === materialId) &&
     bt.soLuongTon > 0,
   );
 
@@ -123,7 +115,7 @@ export default function ChiTietSanPhamPage() {
     setSelectedColor(colorId);
 
     // Nếu size hiện tại không tồn tại cho màu mới thì bỏ chọn size
-    if (selectedSize && !hasVariant(colorId, selectedSize, selectedMaterial)) {
+    if (selectedSize && !hasVariant(colorId, selectedSize)) {
       setSelectedSize(null);
     }
   };
@@ -228,7 +220,7 @@ export default function ChiTietSanPhamPage() {
               <p className="text-sm font-semibold text-gray-700 mb-2">Kích thước</p>
               <div className="flex gap-2 flex-wrap">
                 {sizes.map(s => {
-                  const available = hasVariant(selectedColor, s.id, selectedMaterial);
+                  const available = hasVariant(selectedColor, s.id);
                   return (
                     <button key={s.id} onClick={() => handleSelectSize(s.id)}
                       disabled={!available}
@@ -247,24 +239,7 @@ export default function ChiTietSanPhamPage() {
             </div>
           )}
 
-          {/* Material */}
-          {materials.length > 1 && (
-            <div>
-              <p className="text-sm font-semibold text-gray-700 mb-2">Chất liệu</p>
-              <div className="flex gap-2 flex-wrap">
-                {materials.map(m => (
-                  <button key={m.id} onClick={() => setSelectedMaterial(m.id)}
-                    className={`px-3 py-2 rounded-lg border text-sm transition-all ${
-                      selectedMaterial === m.id
-                        ? 'bg-indigo-50 border-indigo-400 text-indigo-700'
-                        : 'border-gray-200 text-gray-600 hover:border-gray-400'
-                    }`}>
-                    {m.tenChatLieu}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Material: đã bỏ chọn chất liệu ở cấp biến thể */}
 
           {/* Stock info */}
           {selectedBienThe && (

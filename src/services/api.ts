@@ -83,6 +83,7 @@ export interface SanPhamItem {
   trangThaiSanPham: string;
   danhMuc?: { id: number; tenDanhMuc: string; duongDan: string };
   thuongHieu?: { id: number; tenThuongHieu: string };
+  chatLieu?: { id: number; tenChatLieu: string; moTa?: string };
 }
 
 /** Biến thể sản phẩm - fields từ toSanPhamDetail backend */
