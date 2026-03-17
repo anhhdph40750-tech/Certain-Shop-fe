@@ -276,6 +276,7 @@ export default function DatHangPage() {
             <div className="space-y-2">
               {[
                 { value: 'COD', label: '💵 Thanh toán khi nhận hàng (COD)' },
+                  { value: 'VNPAY', label: '💳 Thanh toán qua VNPay' },
               
               ].map(pt => (
                 <label key={pt.value}

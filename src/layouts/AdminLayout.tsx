@@ -25,9 +25,9 @@ export default function AdminLayout() {
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-gray-700">
           {!collapsed && (
-            <Link to="/" className="text-white font-bold text-lg">
+            <p className="text-white font-bold text-lg">
               Certain<span className="text-indigo-400">Shop</span>
-            </Link>
+            </p>
           )}
           <button onClick={() => setCollapsed(!collapsed)} className="text-gray-400 hover:text-white p-1 rounded">
             {collapsed ? <Menu className="w-5 h-5" /> : <X className="w-5 h-5" />}

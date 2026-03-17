@@ -107,6 +107,31 @@ export default function ChiTietSanPhamPage() {
     navigate('/gio-hang');
   };
 
+  // Helper: kiểm tra có biến thể hợp lệ với tổ hợp đã chọn không
+  const hasVariant = (
+    colorId: number | null,
+    sizeId: number | null,
+    materialId: number | null,
+  ) => bienThe.some(bt =>
+    (!colorId || bt.mauSac?.id === colorId) &&
+    (!sizeId || bt.kichThuoc?.id === sizeId) &&
+    (!materialId || bt.chatLieu?.id === materialId) &&
+    bt.soLuongTon > 0,
+  );
+
+  const handleSelectColor = (colorId: number) => {
+    setSelectedColor(colorId);
+
+    // Nếu size hiện tại không tồn tại cho màu mới thì bỏ chọn size
+    if (selectedSize && !hasVariant(colorId, selectedSize, selectedMaterial)) {
+      setSelectedSize(null);
+    }
+  };
+
+  const handleSelectSize = (sizeId: number) => {
+    setSelectedSize(sizeId);
+  };
+
   if (loading) return <LoadingSpinner fullPage />;
   if (!sanPham) return <div className="text-center py-20 text-gray-500">Không tìm thấy sản phẩm</div>;
 
@@ -187,7 +212,7 @@ export default function ChiTietSanPhamPage() {
               </p>
               <div className="flex gap-2 flex-wrap">
                 {colors.map(c => (
-                  <button key={c.id} onClick={() => setSelectedColor(c.id)}
+                <button key={c.id} onClick={() => handleSelectColor(c.id)}
                     title={c.tenMauSac}
                     className={`w-9 h-9 rounded-full border-2 transition-all ${selectedColor === c.id ? 'border-indigo-500 scale-110 ring-2 ring-indigo-200' : 'border-gray-200 hover:border-gray-400'}`}
                     style={{ backgroundColor: c.maHex || '#ccc' }}
@@ -203,13 +228,9 @@ export default function ChiTietSanPhamPage() {
               <p className="text-sm font-semibold text-gray-700 mb-2">Kích thước</p>
               <div className="flex gap-2 flex-wrap">
                 {sizes.map(s => {
-                  const available = bienThe.some(bt =>
-                    bt.kichThuoc?.id === s.id &&
-                    (!selectedColor || bt.mauSac?.id === selectedColor) &&
-                    bt.soLuongTon > 0
-                  );
+                  const available = hasVariant(selectedColor, s.id, selectedMaterial);
                   return (
-                    <button key={s.id} onClick={() => setSelectedSize(s.id)}
+                    <button key={s.id} onClick={() => handleSelectSize(s.id)}
                       disabled={!available}
                       className={`min-w-12 px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
                         selectedSize === s.id

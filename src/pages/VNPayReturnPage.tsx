@@ -14,7 +14,7 @@ interface PaymentResult {
 export default function VNPayReturnPage() {
   const [loading, setLoading] = useState(true);
   const [kq, setKq] = useState<PaymentResult | null>(null);
-  const [soGiay, setSoGiay] = useState(5);
+  const [soGiay, setSoGiay] = useState(10);
   const navigate = useNavigate();
   const location = useLocation();
 
