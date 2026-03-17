@@ -495,6 +495,12 @@ export const adminApi = {
   /** PUT /quan-ly/nguoi-dung/{id}/vai-tro — body: { vaiTroId: number } (2=NV, 3=KH) */
   doiVaiTroNguoiDung: (id: number, vaiTroId: number) =>
     api.put<ApiResponse<null>>(`/quan-ly/nguoi-dung/${id}/vai-tro`, { vaiTroId }),
+
+  huyDonHang: (maDonHang: string, ghiChu = "Admin/Nhân viên hủy đơn") =>
+  api.post(`/quan-ly/don-hang/${maDonHang}/cap-nhat-trang-thai`, {
+    trangThai: "DA_HUY",
+    ghiChu
+  }),
 };
 
 // ===================== THUỘC TÍNH (ADMIN) =====================
