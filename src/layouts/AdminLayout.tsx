@@ -12,6 +12,7 @@ const navItems = [
   { to: '/quan-ly/don-hang', label: 'Đơn hàng', icon: ShoppingCart },
   { to: '/quan-ly/nguoi-dung', label: 'Khách hàng', icon: Users },
   { to: '/quan-ly/thuoc-tinh', label: 'Thuộc tính', icon: Tags },
+  { to: '/quan-ly/voucher', label: 'Voucher', icon: Ticket },
 ];
 
 export default function AdminLayout() {

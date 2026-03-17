@@ -731,7 +731,6 @@ function BienTheSanPhamModal({
                       <th className="px-3 py-2 text-left text-gray-500">ID</th>
                       <th className="px-3 py-2 text-left text-gray-500">Kích thước</th>
                       <th className="px-3 py-2 text-left text-gray-500">Màu sắc</th>
-                      <th className="px-3 py-2 text-left text-gray-500">Chất liệu</th>
                       <th className="px-3 py-2 text-left text-gray-500">Giá</th>
                       <th className="px-3 py-2 text-left text-gray-500">Số lượng</th>
                       <th className="px-3 py-2 text-left text-gray-500">Mặc định</th>
@@ -749,9 +748,6 @@ function BienTheSanPhamModal({
                           </td>
                           <td className="px-3 py-2">
                             {bt.mauSac?.tenMauSac || '—'}
-                          </td>
-                          <td className="px-3 py-2">
-                            {bt.chatLieu?.tenChatLieu || '—'}
                           </td>
                           <td className="px-3 py-2 font-semibold text-indigo-600">
                             {bt.gia != null ? formatCurrency(bt.gia) : '—'}

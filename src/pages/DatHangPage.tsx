@@ -289,20 +289,34 @@ export default function DatHangPage() {
           </div>
 
           {/* Voucher code */}
-          {/* <div className="bg-white rounded-xl border border-gray-100 p-6">
+          <div className="bg-white rounded-xl border border-gray-100 p-6">
             <h2 className="font-bold text-gray-900 mb-4">Mã voucher</h2>
             <div className="flex gap-3">
-              <input value={maVoucher} onChange={e => setMaVoucher(e.target.value.toUpperCase())}
-                placeholder="Nhập mã voucher" className="input-field flex-1" />
-              <button onClick={handleKiemTraVoucher} className="btn-secondary px-4">Áp dụng</button>
+              <input
+                value={maVoucher}
+                onChange={e => setMaVoucher(e.target.value.toUpperCase())}
+                placeholder="Nhập mã voucher"
+                className="input-field flex-1"
+              />
+              <button
+                type="button"
+                onClick={handleKiemTraVoucher}
+                className="btn-secondary px-4"
+              >
+                Áp dụng
+              </button>
             </div>
             {voucherInfo && (
-              <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-green-700 text-sm font-medium">✓ {voucherInfo.maVoucher}</p>
-                <p className="text-green-600 text-sm">Giảm: {formatCurrency(voucherInfo.giaTriGiam)}</p>
+              <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm">
+                <p className="text-green-700 font-medium">
+                  ✓ Đã áp dụng voucher {voucherInfo.maVoucher}
+                </p>
+                <p className="text-green-600">
+                  Giảm: {formatCurrency(voucherInfo.giaTriGiam)}
+                </p>
               </div>
             )}
-          </div> */}
+          </div>
         </div>
 
         {/* Right - Summary */}
