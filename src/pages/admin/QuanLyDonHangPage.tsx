@@ -14,9 +14,7 @@ const TRANG_THAI_OPTIONS = [
   { value: 'DA_XAC_NHAN', label: 'Đã xác nhận' },
   { value: 'DANG_XU_LY', label: 'Đang xử lý' },
   { value: 'DANG_GIAO', label: 'Đang giao' },
-  { value: 'DA_GIAO', label: 'Đã giao' },
   { value: 'HOAN_TAT', label: 'Hoàn tất' },
-  { value: 'HOAN_THANH', label: 'Hoàn thành' },
   { value: 'DA_HUY', label: 'Đã hủy' },
 ];
 
@@ -41,6 +39,7 @@ export default function QuanLyDonHangPage() {
   const [tuKhoa, setTuKhoa] = useState('');
   const [trangThai, setTrangThai] = useState('');
   const [trang, setTrang] = useState(0);
+const [sort, setSort] = useState<'asc' | 'desc'>('desc');
   const [tongTrang, setTongTrang] = useState(0);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [chiTietDonHang, setChiTietDonHang] = useState<DonHang | null>(null);
@@ -57,13 +56,18 @@ export default function QuanLyDonHangPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    adminApi.danhSachDonHang({ trangThai: trangThai || undefined, tuKhoa: tuKhoa || undefined, trang })
+    adminApi.danhSachDonHang({ 
+  trangThai: trangThai || undefined, 
+  tuKhoa: tuKhoa || undefined, 
+  trang,
+   sort
+})
       .then(r => {
         setDanhSach(r.data.duLieu?.danhSach || []);
         setTongTrang(r.data.duLieu?.tongSoTrang || 0);
       })
       .finally(() => setLoading(false));
-  }, [trangThai, tuKhoa, trang]);
+  }, [trangThai, tuKhoa, trang, sort]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -127,6 +131,17 @@ export default function QuanLyDonHangPage() {
           <input className="input-field pl-9 text-sm" placeholder="Tìm mã đơn, người nhận..."
             value={tuKhoa} onChange={e => { setTuKhoa(e.target.value); setTrang(0); }} />
         </div>
+        <select
+  className="input-field w-40 text-sm"
+  value={sort}
+  onChange={(e) => {
+    setSort(e.target.value as 'asc' | 'desc');
+    setTrang(0);
+  }}
+>
+  <option value="desc">Mới nhất</option>
+  <option value="asc">Cũ nhất</option>
+</select>
         <select className="input-field w-44 text-sm" value={trangThai}
           onChange={e => { setTrangThai(e.target.value); setTrang(0); }}>
           {TRANG_THAI_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}

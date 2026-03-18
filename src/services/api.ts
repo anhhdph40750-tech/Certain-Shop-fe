@@ -423,7 +423,7 @@ export const adminApi = {
 
   // --- Đơn hàng admin ---
   /** GET /quan-ly/don-hang → { danhSach, tongSoTrang, tongSoBan, trangHienTai } */
-  danhSachDonHang: (params?: { trang?: number; kichThuocTrang?: number; trangThai?: string; tuKhoa?: string }) =>
+  danhSachDonHang: (params?: { trang?: number; kichThuocTrang?: number; trangThai?: string; tuKhoa?: string; sort?: 'asc'| 'desc' }) =>
     api.get<ApiResponse<{ danhSach: DonHang[]; tongSoTrang: number; tongSoBan: number }>>('/quan-ly/don-hang', { params }),
 
   /** GET /quan-ly/don-hang/{maDonHang} */
