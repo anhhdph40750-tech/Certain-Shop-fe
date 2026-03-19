@@ -83,6 +83,7 @@ export interface SanPhamItem {
   trangThaiSanPham: string;
   danhMuc?: { id: number; tenDanhMuc: string; duongDan: string };
   thuongHieu?: { id: number; tenThuongHieu: string };
+  chatLieu?: { id: number; tenChatLieu: string; moTa?: string };
 }
 
 /** Biến thể sản phẩm - fields từ toSanPhamDetail backend */
@@ -423,7 +424,7 @@ export const adminApi = {
 
   // --- Đơn hàng admin ---
   /** GET /quan-ly/don-hang → { danhSach, tongSoTrang, tongSoBan, trangHienTai } */
-  danhSachDonHang: (params?: { trang?: number; kichThuocTrang?: number; trangThai?: string; tuKhoa?: string; sort?: 'asc'| 'desc' }) =>
+  danhSachDonHang: (params?: { trang?: number; kichThuocTrang?: number; trangThai?: string; tuKhoa?: string }) =>
     api.get<ApiResponse<{ danhSach: DonHang[]; tongSoTrang: number; tongSoBan: number }>>('/quan-ly/don-hang', { params }),
 
   /** GET /quan-ly/don-hang/{maDonHang} */
@@ -495,14 +496,6 @@ export const adminApi = {
   /** PUT /quan-ly/nguoi-dung/{id}/vai-tro — body: { vaiTroId: number } (2=NV, 3=KH) */
   doiVaiTroNguoiDung: (id: number, vaiTroId: number) =>
     api.put<ApiResponse<null>>(`/quan-ly/nguoi-dung/${id}/vai-tro`, { vaiTroId }),
-
-  huyDonHang: (maDonHang: string, ghiChu = "Admin/Nhân viên hủy đơn") =>
-  api.post(`/quan-ly/don-hang/${maDonHang}/cap-nhat-trang-thai`, {
-    trangThai: "DA_HUY",
-    ghiChu
-  }),
-  layHang: (maDonHang: string) =>
-  api.post(`/quan-ly/don-hang/lay-hang?maDonHang=${maDonHang}`)
 };
 
 // ===================== THUỘC TÍNH (ADMIN) =====================

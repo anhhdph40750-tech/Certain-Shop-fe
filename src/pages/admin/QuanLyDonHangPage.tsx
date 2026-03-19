@@ -6,27 +6,28 @@ import type { DonHang } from '../../services/api';
 import { formatCurrency, formatDate, trangThaiDonHangLabel, getImageUrl, handleImgError } from '../../utils/format';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import QRCode from "react-qr-code";
-import { Html5Qrcode } from "html5-qrcode";
+
 const TRANG_THAI_OPTIONS = [
   { value: '', label: 'Tất cả' },
   { value: 'CHO_THANH_TOAN', label: 'Chờ thanh toán' },
-  { value: 'CHO_XAC_NHAN', label: 'Chờ xác nhận' },
-  { value: 'DA_XAC_NHAN', label: 'Đã xác nhận' },
-  { value: 'DANG_XU_LY', label: 'Đang xử lý' },
-  { value: 'DANG_GIAO', label: 'Đang giao' },
-  { value: 'HOAN_TAT', label: 'Hoàn tất' },
-  { value: 'DA_HUY', label: 'Đã hủy' },
+  { value: 'CHO_XAC_NHAN',   label: 'Chờ xác nhận' },
+  { value: 'DA_XAC_NHAN',    label: 'Đã xác nhận' },
+  { value: 'DANG_XU_LY',     label: 'Đang xử lý' },
+  { value: 'DANG_GIAO',      label: 'Đang giao' },
+  { value: 'DA_GIAO',        label: 'Đã giao' },
+  { value: 'HOAN_TAT',       label: 'Hoàn tất' },
+  { value: 'HOAN_THANH',     label: 'Hoàn thành' },
+  { value: 'DA_HUY',         label: 'Đã hủy' },
 ];
 
 // Luồng chuyển trạng thái thuận chiều — backend quyết định key thực tế
 const CHUYEN_TIEP: Record<string, string> = {
   'CHO_THANH_TOAN': 'CHO_XAC_NHAN', // COD order: initial → awaiting confirmation
-  'DA_THANH_TOAN': 'CHO_XAC_NHAN', // VNPay order: paid → awaiting confirmation
+  'DA_THANH_TOAN':  'CHO_XAC_NHAN', // VNPay order: paid → awaiting confirmation
   'CHO_XAC_NHAN': 'DA_XAC_NHAN',    // awaiting confirmation → admin confirmed (inventory deducted)
-  'DA_XAC_NHAN': 'DANG_XU_LY',     // confirmed → processing
-  'DANG_XU_LY': 'DANG_GIAO',      // processing → shipping
-  'DANG_GIAO': 'HOAN_TAT',       // shipping → completed
+  'DA_XAC_NHAN':  'DANG_XU_LY',     // confirmed → processing
+  'DANG_XU_LY':   'DANG_GIAO',      // processing → shipping
+  'DANG_GIAO':    'HOAN_TAT',       // shipping → completed
 };
 
 // Helper to get status label and color
@@ -40,13 +41,10 @@ export default function QuanLyDonHangPage() {
   const [tuKhoa, setTuKhoa] = useState('');
   const [trangThai, setTrangThai] = useState('');
   const [trang, setTrang] = useState(0);
-  const [sort, setSort] = useState<'asc' | 'desc'>('desc');
   const [tongTrang, setTongTrang] = useState(0);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [chiTietDonHang, setChiTietDonHang] = useState<DonHang | null>(null);
   const [modalDonHang, setModalDonHang] = useState<DonHang | null>(null);
-  const [xacNhanHuy, setXacNhanHuy] = useState<DonHang | null>(null);
-
 
   // Confirm dialog state for Staff transition
   const [confirmDialog, setConfirmDialog] = useState<{ show: boolean; maDonHang: string; trangThaiMoi: string; ghiChu: string }>({
@@ -54,54 +52,16 @@ export default function QuanLyDonHangPage() {
   });
 
   const { isAdmin } = useAuthStore();
-  const startScan = () => {
-  const scanner = new Html5Qrcode("reader");
-
-  scanner.start(
-    { facingMode: "environment" },
-    {
-      fps: 10,
-      qrbox: 250
-    },
-    (decodedText) => {
-
-      // khi quét được QR
-      setScanModal((prev) => ({
-        ...prev,
-        input: decodedText
-      }));
-
-      scanner.stop();
-    },
-    (error) => {
-      console.log(error);
-    }
-  );
-};
-  const [scanModal, setScanModal] = useState<{
-    show: boolean;
-    maDonHang: string;
-    input: string;
-  }>({
-    show: false,
-    maDonHang: "",
-    input: ""
-  });
 
   const load = useCallback(() => {
     setLoading(true);
-    adminApi.danhSachDonHang({
-      trangThai: trangThai || undefined,
-      tuKhoa: tuKhoa || undefined,
-      trang,
-      sort
-    })
+    adminApi.danhSachDonHang({ trangThai: trangThai || undefined, tuKhoa: tuKhoa || undefined, trang })
       .then(r => {
         setDanhSach(r.data.duLieu?.danhSach || []);
         setTongTrang(r.data.duLieu?.tongSoTrang || 0);
       })
       .finally(() => setLoading(false));
-  }, [trangThai, tuKhoa, trang, sort]);
+  }, [trangThai, tuKhoa, trang]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -130,22 +90,13 @@ export default function QuanLyDonHangPage() {
   };
 
   const chuyenTrangThai = async (maDonHang: string, trangThaiMoi: string, ghiChu = '') => {
-
-    // Nếu chuyển sang ĐANG_GIAO → mở popup quét QR
-    if (trangThaiMoi === "DANG_GIAO") {
-      setScanModal({
-        show: true,
-        maDonHang,
-        input: ""
-      });
-      return;
-    }
-
+    // Staff phải confirm, Admin không cần
     if (!isAdmin()) {
       setConfirmDialog({ show: true, maDonHang, trangThaiMoi, ghiChu });
       return;
     }
 
+    // Admin không cần confirm, execute ngay
     await executeChuyenTrangThai(maDonHang, trangThaiMoi, ghiChu);
   };
 
@@ -174,17 +125,6 @@ export default function QuanLyDonHangPage() {
           <input className="input-field pl-9 text-sm" placeholder="Tìm mã đơn, người nhận..."
             value={tuKhoa} onChange={e => { setTuKhoa(e.target.value); setTrang(0); }} />
         </div>
-        <select
-          className="input-field w-40 text-sm"
-          value={sort}
-          onChange={(e) => {
-            setSort(e.target.value as 'asc' | 'desc');
-            setTrang(0);
-          }}
-        >
-          <option value="desc">Mới nhất</option>
-          <option value="asc">Cũ nhất</option>
-        </select>
         <select className="input-field w-44 text-sm" value={trangThai}
           onChange={e => { setTrangThai(e.target.value); setTrang(0); }}>
           {TRANG_THAI_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -209,90 +149,49 @@ export default function QuanLyDonHangPage() {
                 const tt = getStatusDisplay(dh.trangThaiDonHang);
                 const nextState = CHUYEN_TIEP[dh.trangThaiDonHang];
                 const nextLabel = nextState ? getStatusDisplay(nextState).label : null;
-
+                const isExpanded = expanded === dh.maDonHang;
                 return (
                   <tr key={dh.maDonHang} className="group hover:bg-gray-50">
-                    {/* Mã đơn */}
                     <td className="px-4 py-3">
-                      <span className="font-mono font-medium text-gray-900">
-                        #{dh.maDonHang}
-                      </span>
+                      <span className="font-mono font-medium text-gray-900">#{dh.maDonHang}</span>
                     </td>
-
-                    {/* Người nhận */}
                     <td className="px-4 py-3">
-                      <p className="font-medium text-gray-800">
-                        {dh.tenNguoiNhan}
-                      </p>
-                      <p className="text-gray-400 text-xs">
-                        {dh.sdtNguoiNhan}
-                      </p>
+                      <p className="font-medium text-gray-800">{dh.tenNguoiNhan}</p>
+                      <p className="text-gray-400 text-xs">{dh.sdtNguoiNhan}</p>
                     </td>
-
-                    {/* Ngày đặt */}
-                    <td className="px-4 py-3 text-gray-500">
-                      {formatDate(dh.thoiGianTao)}
-                    </td>
-
-                    {/* Tổng tiền */}
-                    <td className="px-4 py-3 font-semibold text-gray-900">
-                      {formatCurrency(dh.tongTienThanhToan)}
-                    </td>
-
-                    {/* ✅ TRẠNG THÁI + NÚT CHUYỂN */}
+                    <td className="px-4 py-3 text-gray-500">{formatDate(dh.thoiGianTao)}</td>
+                    <td className="px-4 py-3 font-semibold text-gray-900">{formatCurrency(dh.tongTienThanhToan)}</td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`badge badge-${tt.color} w-fit`}>
-                          {tt.label}
-                        </span>
-
+                      <span className={`badge badge-${tt.color} w-fit`}>{tt.label}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                       
                         {nextLabel && (
                           <button
-                            onClick={() =>
-                              chuyenTrangThai(dh.maDonHang, nextState)
-                            }
-                            className="text-xs px-2 py-1 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 transition-colors whitespace-nowrap"
-                          >
+                            onClick={() => chuyenTrangThai(dh.maDonHang, nextState)}
+                            className="text-xs px-2 py-1 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 transition-colors whitespace-nowrap">
                             → {nextLabel}
                           </button>
                         )}
-
-                        {[
-                          "CHO_XAC_NHAN",
-                          "DA_XAC_NHAN",
-                          "DANG_XU_LY",
-                          "DANG_GIAO",
-                        ].includes(dh.trangThaiDonHang) && (
-                            <button
-                              onClick={() => setXacNhanHuy(dh)}
-                              className="text-xs px-3 py-1 bg-red-50 text-red-500 rounded hover:bg-red-100"
-                            >
-                              Hủy
-                            </button>
-                          )}
+                        {dh.trangThaiDonHang === 'CHO_XAC_NHAN' && (
+                          <button
+                            onClick={() => chuyenTrangThai(dh.maDonHang, 'DA_HUY', 'Admin hủy đơn')}
+                            className="text-xs px-2 py-1 bg-red-50 text-red-500 rounded hover:bg-red-100 transition-colors">
+                            Hủy
+                          </button>
+                        )}
+                       
                       </div>
-                    </td>
-
-                    {/* ✅ ICON XEM CHI TIẾT */}
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => xemChiTiet(dh.maDonHang)}
-                        className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
-                        title="Xem chi tiết"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
                     </td>
                   </tr>
                 );
               })}
 
+              {/* Expanded detail rows */}
+              
               {danhSach.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="text-center py-10 text-gray-400">
-                    Không có đơn hàng
-                  </td>
-                </tr>
+                <tr><td colSpan={6} className="text-center py-10 text-gray-400">Không có đơn hàng</td></tr>
               )}
             </tbody>
           </table>
@@ -315,7 +214,6 @@ export default function QuanLyDonHangPage() {
               <div>
                 <h2 className="text-lg font-bold text-white">Chi tiết đơn hàng</h2>
                 <p className="text-sm text-indigo-100">#{modalDonHang.maDonHang}</p>
-               
               </div>
               <button
                 onClick={() => setModalDonHang(null)}
@@ -416,39 +314,14 @@ export default function QuanLyDonHangPage() {
               {/* Tóm tắt chi phí */}
               <div className="border-t-2 border-gray-200 pt-4">
                 <div className="space-y-2 text-sm">
-
-                  {/* Tiền sản phẩm */}
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Tiền sản phẩm:</span>
-                    <span className="font-medium text-gray-900">
-                      {formatCurrency(modalDonHang.tongTienHang || 0)}
-                    </span>
+                    <span className="text-gray-600">Tạm tính:</span>
+                    <span className="font-medium text-gray-900">{formatCurrency(modalDonHang.tongTienThanhToan || 0)}</span>
                   </div>
-
-                  {/* Phí ship */}
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Phí vận chuyển:</span>
-                    <span className="font-medium text-gray-900">
-                      {formatCurrency(modalDonHang.phiVanChuyen || 0)}
-                    </span>
-                  </div>
-
-                  {/* Giảm giá */}
-                  {modalDonHang.soTienGiamGia > 0 && (
-                    <div className="flex justify-between text-green-600">
-                      <span>Giảm giá:</span>
-                      <span>-{formatCurrency(modalDonHang.soTienGiamGia)}</span>
-                    </div>
-                  )}
-
-                  {/* Tổng cộng */}
-                  <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-200">
+                  <div className="flex justify-between text-lg font-bold pt-2">
                     <span className="text-gray-900">Tổng cộng:</span>
-                    <span className="text-indigo-600">
-                      {formatCurrency(modalDonHang.tongTienThanhToan || 0)}
-                    </span>
+                    <span className="text-indigo-600">{formatCurrency(modalDonHang.tongTienThanhToan || 0)}</span>
                   </div>
-
                 </div>
               </div>
             </div>
@@ -465,76 +338,6 @@ export default function QuanLyDonHangPage() {
         </div>
       )}
 
-      {scanModal.show && (
-
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-
-          <div className="bg-white p-6 rounded-xl w-96 space-y-4">
-
-            <h3 className="text-lg font-semibold">
-              Quét QR / Nhập mã đơn
-            </h3>
-
-            <p className="text-sm text-gray-500">
-              Đơn cần giao: <b>{scanModal.maDonHang}</b>
-               <QRCode value={scanModal.maDonHang} size={120} />
-                <button
-    onClick={startScan}
-    className="px-3 py-2 bg-green-600 text-white rounded"
-  >
-    Quét QR
-  </button>
-            </p>
-
-            <input
-              type="text"
-              placeholder="Nhập hoặc quét mã đơn"
-              value={scanModal.input}
-              onChange={(e) => setScanModal({ ...scanModal, input: e.target.value })}
-              className="border rounded px-3 py-2 w-full"
-            />
-            <div id="reader" className="w-full mt-3"></div>
-
-            <div className="flex justify-end gap-3">
-
-              <button
-                onClick={() => setScanModal({ show: false, maDonHang: "", input: "" })}
-                className="px-3 py-2 border rounded"
-              >
-                Hủy
-              </button>
-
-              <button
-                onClick={async () => {
-
-                  if (scanModal.input !== scanModal.maDonHang) {
-                    toast.error("Sai mã đơn");
-                    return;
-                  }
-
-                  await executeChuyenTrangThai(
-                    scanModal.maDonHang,
-                    "DANG_GIAO"
-                  );
-
-                  setScanModal({
-                    show: false,
-                    maDonHang: "",
-                    input: ""
-                  });
-
-                }}
-                className="px-4 py-2 bg-blue-600 text-white rounded"
-              >
-                Xác nhận giao
-              </button>
-
-            </div>
-
-          </div>
-        </div>
-      )}
-
       {/* Staff Confirm Dialog */}
       {confirmDialog.show && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 rounded-lg">
@@ -543,12 +346,12 @@ export default function QuanLyDonHangPage() {
             <p className="text-gray-600 mb-2">Bạn có chắc muốn chuyển trạng thái đơn hàng này?</p>
             <p className="text-sm text-gray-500 mb-6">Đơn: <span className="font-medium">{confirmDialog.maDonHang}</span> → <span className="font-medium">{getStatusDisplay(confirmDialog.trangThaiMoi).label}</span></p>
             <div className="flex gap-3 justify-end">
-              <button
+              <button 
                 onClick={() => setConfirmDialog({ show: false, maDonHang: '', trangThaiMoi: '', ghiChu: '' })}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
                 Hủy
               </button>
-              <button
+              <button 
                 onClick={async () => {
                   await executeChuyenTrangThai(confirmDialog.maDonHang, confirmDialog.trangThaiMoi, confirmDialog.ghiChu);
                   setConfirmDialog({ show: false, maDonHang: '', trangThaiMoi: '', ghiChu: '' });
@@ -558,64 +361,6 @@ export default function QuanLyDonHangPage() {
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* MODAL XÁC NHẬN HỦY */}
-      {xacNhanHuy && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-
-          <div className="bg-white rounded-xl p-6 w-96">
-
-            <h3 className="text-lg font-semibold mb-3">
-              Xác nhận hủy đơn
-            </h3>
-
-            <p className="text-sm text-gray-600 mb-6">
-              Bạn có chắc muốn hủy đơn hàng #
-              {xacNhanHuy.maDonHang} ?
-            </p>
-
-            <div className="flex justify-end gap-3">
-
-              <button
-                onClick={() => setXacNhanHuy(null)}
-                className="px-4 py-2 text-sm border rounded"
-              >
-                Quay lại
-              </button>
-
-              <button
-                onClick={async () => {
-                  try {
-
-                    await adminApi.huyDonHang(
-                      xacNhanHuy.maDonHang
-                    );
-
-                    toast.success("Đã hủy đơn hàng");
-
-                    load();
-
-                  } catch (err: any) {
-
-                    toast.error(
-                      err?.response?.data?.thongBao || "Hủy đơn thất bại"
-                    );
-
-                  }
-
-                  setXacNhanHuy(null);
-                }}
-                className="px-4 py-2 text-sm bg-red-500 text-white rounded hover:bg-red-600"
-              >
-                Xác nhận hủy
-              </button>
-
-            </div>
-
-          </div>
-
         </div>
       )}
     </div>

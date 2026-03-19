@@ -10,6 +10,7 @@ export default function QuanLySanPhamPage() {
   const [danhSach, setDanhSach] = useState<SanPhamItem[]>([]);
   const [danhMuc, setDanhMuc] = useState<DanhMuc[]>([]);
   const [thuongHieu, setThuongHieu] = useState<ThuongHieu[]>([]);
+  const [chatLieu, setChatLieu] = useState<ChatLieu[]>([]);
   const [loading, setLoading] = useState(true);
   const [tuKhoa, setTuKhoa] = useState('');
   const [danhMucId, setDanhMucId] = useState<number | undefined>();
@@ -21,7 +22,6 @@ export default function QuanLySanPhamPage() {
   const [selectedSanPham, setSelectedSanPham] = useState<SanPhamItem | null>(null);
   const [btKichThuocOptions, setBtKichThuocOptions] = useState<KichThuoc[]>([]);
   const [btMauSacOptions, setBtMauSacOptions] = useState<MauSac[]>([]);
-  const [btChatLieuOptions, setBtChatLieuOptions] = useState<ChatLieu[]>([]);
   const [bienTheModalList, setBienTheModalList] = useState<BienTheType[]>([]);
   const [loadingBienThe, setLoadingBienThe] = useState(false);
 
@@ -39,6 +39,7 @@ export default function QuanLySanPhamPage() {
   useEffect(() => {
     sanPhamApi.danhMuc().then(r => setDanhMuc(r.data.duLieu || []));
     sanPhamApi.thuongHieu().then(r => setThuongHieu(r.data.duLieu || []));
+    thuocTinhApi.danhSachChatLieu().then(r => setChatLieu(r.data.duLieu || []));
   }, []);
 
   const xoa = async (id: number) => {
@@ -55,15 +56,13 @@ export default function QuanLySanPhamPage() {
   const loadBienTheData = async (sp: SanPhamItem) => {
     setLoadingBienThe(true);
     try {
-      const [ktRes, msRes, clRes, detailRes] = await Promise.all([
+      const [ktRes, msRes, detailRes] = await Promise.all([
         thuocTinhApi.danhSachKichThuoc(),
         thuocTinhApi.danhSachMauSac(),
-        thuocTinhApi.danhSachChatLieu(),
         sanPhamApi.chiTiet(sp.duongDan),
       ]);
       setBtKichThuocOptions(ktRes.data.duLieu || []);
       setBtMauSacOptions(msRes.data.duLieu || []);
-      setBtChatLieuOptions(clRes.data.duLieu || []);
       setBienTheModalList(detailRes.data.duLieu?.bienThe || []);
     } catch {
       toast.error('Không thể tải biến thể sản phẩm');
@@ -88,7 +87,7 @@ export default function QuanLySanPhamPage() {
       await adminApi.taoBulkBienThe(selectedSanPham.id, rows.map(bt => ({
         kichThuocId: bt.kichThuocId ? Number(bt.kichThuocId) : null,
         mauSacId: bt.mauSacId ? Number(bt.mauSacId) : null,
-        chatLieuId: bt.chatLieuId ? Number(bt.chatLieuId) : null,
+        chatLieuId: null,
         gia: bt.gia ? Number(bt.gia) : null,
         soLuongTon: bt.soLuongTon ? Number(bt.soLuongTon) : 0,
         macDinh: bt.macDinh,
@@ -184,6 +183,7 @@ export default function QuanLySanPhamPage() {
                 editingSanPham={editingSanPham}
                 danhMuc={danhMuc}
                 thuongHieu={thuongHieu}
+                chatLieu={chatLieu}
                 onSave={() => { setShowForm(false); load(); }}
                 onCancel={() => setShowForm(false)}
               />
@@ -301,7 +301,6 @@ export default function QuanLySanPhamPage() {
           maSanPham={selectedSanPham.maSanPham}
           kichThuocOptions={btKichThuocOptions}
           mauSacOptions={btMauSacOptions}
-          chatLieuOptions={btChatLieuOptions}
           bienTheDaCo={bienTheModalList}
           loading={loadingBienThe}
           onSave={handleSaveBienThe}
@@ -322,13 +321,12 @@ export default function QuanLySanPhamPage() {
 interface BienTheForm {
   kichThuocId: string;
   mauSacId: string;
-  chatLieuId: string;
   gia: string;
   soLuongTon: string;
   macDinh: boolean;
 }
 
-const EMPTY_BT: BienTheForm = { kichThuocId: '', mauSacId: '', chatLieuId: '', gia: '', soLuongTon: '0', macDinh: false };
+const EMPTY_BT: BienTheForm = { kichThuocId: '', mauSacId: '', gia: '', soLuongTon: '0', macDinh: false };
 
 interface BienTheSanPhamModalProps {
   open: boolean;
@@ -337,7 +335,6 @@ interface BienTheSanPhamModalProps {
   maSanPham: string;
   kichThuocOptions: KichThuoc[];
   mauSacOptions: MauSac[];
-  chatLieuOptions: ChatLieu[];
   bienTheDaCo: BienTheType[];
   loading: boolean;
   onSave: (rows: BienTheForm[]) => Promise<void> | void;
@@ -351,7 +348,6 @@ function BienTheSanPhamModal({
   maSanPham,
   kichThuocOptions,
   mauSacOptions,
-  chatLieuOptions,
   bienTheDaCo,
   loading,
   onSave,
@@ -369,7 +365,6 @@ function BienTheSanPhamModal({
   // Bulk selection → auto-generate combinations
   const [pickSizes, setPickSizes] = useState<string[]>([]);
   const [pickColors, setPickColors] = useState<string[]>([]);
-  const [pickMaterials, setPickMaterials] = useState<string[]>([]);
   const [genGia, setGenGia] = useState('');
   const [genSoLuong, setGenSoLuong] = useState('0');
 
@@ -398,45 +393,41 @@ function BienTheSanPhamModal({
     }
   };
 
-  const makeKey = (sizeId: string, colorId: string, materialId: string) =>
-    `${sizeId || 'null'}|${colorId || 'null'}|${materialId || 'null'}`;
+  const makeKey = (sizeId: string, colorId: string) =>
+    `${sizeId || 'null'}|${colorId || 'null'}`;
 
   const existingKeys = useMemo(() => {
     const keys = new Set<string>();
     for (const bt of bienTheDaCo) {
       const sizeId = bt.kichThuoc?.id != null ? String(bt.kichThuoc.id) : '';
       const colorId = bt.mauSac?.id != null ? String(bt.mauSac.id) : '';
-      const materialId = bt.chatLieu?.id != null ? String(bt.chatLieu.id) : '';
-      keys.add(makeKey(sizeId, colorId, materialId));
+      keys.add(makeKey(sizeId, colorId));
     }
     return keys;
   }, [bienTheDaCo]);
 
   const generateCombinations = () => {
-    if (pickSizes.length === 0 || pickColors.length === 0 || pickMaterials.length === 0) {
-      toast.error('Vui lòng chọn Size, Màu và Chất liệu để tạo tổ hợp');
+    if (pickSizes.length === 0 || pickColors.length === 0) {
+      toast.error('Vui lòng chọn Size và Màu để tạo tổ hợp');
       return;
     }
 
-    const currentKeys = new Set(rows.map(r => makeKey(r.kichThuocId, r.mauSacId, r.chatLieuId)));
+    const currentKeys = new Set(rows.map(r => makeKey(r.kichThuocId, r.mauSacId)));
     const next: BienTheForm[] = [];
 
     for (const s of pickSizes) {
       for (const c of pickColors) {
-        for (const m of pickMaterials) {
-          const key = makeKey(s, c, m);
-          if (existingKeys.has(key)) continue; // tránh tạo lại biến thể đã có
-          if (currentKeys.has(key)) continue;  // tránh trùng trong rows
-          next.push({
-            kichThuocId: s,
-            mauSacId: c,
-            chatLieuId: m,
-            gia: genGia,
-            soLuongTon: genSoLuong,
-            macDinh: false,
-          });
-          currentKeys.add(key);
-        }
+        const key = makeKey(s, c);
+        if (existingKeys.has(key)) continue; // tránh tạo lại biến thể đã có
+        if (currentKeys.has(key)) continue;  // tránh trùng trong rows
+        next.push({
+          kichThuocId: s,
+          mauSacId: c,
+          gia: genGia,
+          soLuongTon: genSoLuong,
+          macDinh: false,
+        });
+        currentKeys.add(key);
       }
     }
 
@@ -446,7 +437,7 @@ function BienTheSanPhamModal({
     }
 
     setRows(prev => {
-      const keep = prev.filter(r => r.kichThuocId || r.mauSacId || r.chatLieuId || r.gia || r.soLuongTon !== '0');
+      const keep = prev.filter(r => r.kichThuocId || r.mauSacId || r.gia || r.soLuongTon !== '0');
       return [...keep, ...next];
     });
     toast.success(`Đã tạo ${next.length} tổ hợp`);
@@ -461,7 +452,6 @@ function BienTheSanPhamModal({
     setEditBTForm({
       kichThuocId: bt.kichThuoc?.id != null ? String(bt.kichThuoc.id) : '',
       mauSacId: bt.mauSac?.id != null ? String(bt.mauSac.id) : '',
-      chatLieuId: bt.chatLieu?.id != null ? String(bt.chatLieu.id) : '',
       gia: bt.gia != null ? String(bt.gia) : '',
       soLuongTon: bt.soLuongTon != null ? String(bt.soLuongTon) : '0',
       macDinh: !!bt.macDinh,
@@ -473,7 +463,7 @@ function BienTheSanPhamModal({
       await adminApi.capNhatBienThe(bienTheId, {
         kichThuocId: editBTForm.kichThuocId ? Number(editBTForm.kichThuocId) : null,
         mauSacId: editBTForm.mauSacId ? Number(editBTForm.mauSacId) : null,
-        chatLieuId: editBTForm.chatLieuId ? Number(editBTForm.chatLieuId) : null,
+        chatLieuId: null,
         gia: editBTForm.gia ? Number(editBTForm.gia) : null,
         soLuongTon: editBTForm.soLuongTon ? Number(editBTForm.soLuongTon) : 0,
         macDinh: editBTForm.macDinh,
@@ -610,25 +600,6 @@ function BienTheSanPhamModal({
                 </div>
 
                 <div>
-                  <div className="text-xs font-semibold text-gray-700 mb-2">Chất liệu</div>
-                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-auto pr-1">
-                    {chatLieuOptions.map(c => {
-                      const id = String(c.id);
-                      const active = pickMaterials.includes(id);
-                      return (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => togglePick(id, setPickMaterials)}
-                          className={`px-2 py-1 rounded-full text-xs border transition-colors ${
-                            active ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-300'
-                          }`}
-                        >
-                          {c.tenChatLieu}
-                        </button>
-                      );
-                    })}
-                  </div>
                 </div>
               </div>
 
@@ -663,7 +634,7 @@ function BienTheSanPhamModal({
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setPickSizes([]); setPickColors([]); setPickMaterials([]); }}
+                  onClick={() => { setPickSizes([]); setPickColors([]); }}
                   className="btn-secondary text-xs px-3 py-2"
                 >
                   Bỏ chọn
@@ -702,19 +673,6 @@ function BienTheSanPhamModal({
                     {mauSacOptions.map(m => (
                       <option key={m.id} value={m.id}>
                         {m.tenMau}
-                      </option>
-                    ))}
-                  </select>
-
-                  <select
-                    className="input-field text-xs"
-                    value={row.chatLieuId}
-                    onChange={e => updateRow(index, { chatLieuId: e.target.value })}
-                  >
-                    <option value="">Chất liệu</option>
-                    {chatLieuOptions.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.tenChatLieu}
                       </option>
                     ))}
                   </select>
@@ -773,7 +731,6 @@ function BienTheSanPhamModal({
                       <th className="px-3 py-2 text-left text-gray-500">ID</th>
                       <th className="px-3 py-2 text-left text-gray-500">Kích thước</th>
                       <th className="px-3 py-2 text-left text-gray-500">Màu sắc</th>
-                      <th className="px-3 py-2 text-left text-gray-500">Chất liệu</th>
                       <th className="px-3 py-2 text-left text-gray-500">Giá</th>
                       <th className="px-3 py-2 text-left text-gray-500">Số lượng</th>
                       <th className="px-3 py-2 text-left text-gray-500">Mặc định</th>
@@ -791,9 +748,6 @@ function BienTheSanPhamModal({
                           </td>
                           <td className="px-3 py-2">
                             {bt.mauSac?.tenMauSac || '—'}
-                          </td>
-                          <td className="px-3 py-2">
-                            {bt.chatLieu?.tenChatLieu || '—'}
                           </td>
                           <td className="px-3 py-2 font-semibold text-indigo-600">
                             {bt.gia != null ? formatCurrency(bt.gia) : '—'}
@@ -901,18 +855,6 @@ function BienTheSanPhamModal({
                                     </option>
                                   ))}
                                 </select>
-                                <select
-                                  className="input-field text-xs"
-                                  value={editBTForm.chatLieuId}
-                                  onChange={e => setEditBTForm(prev => ({ ...prev, chatLieuId: e.target.value }))}
-                                >
-                                  <option value="">Chất liệu</option>
-                                  {chatLieuOptions.map(c => (
-                                    <option key={c.id} value={c.id}>
-                                      {c.tenChatLieu}
-                                    </option>
-                                  ))}
-                                </select>
                                 <input
                                   type="number"
                                   className="input-field text-xs"
@@ -991,17 +933,18 @@ function BienTheSanPhamModal({
   );
 }
 
-function SanPhamForm({ inModal = false, editingSanPham, danhMuc, thuongHieu, onSave, onCancel }: {
+function SanPhamForm({ inModal = false, editingSanPham, danhMuc, thuongHieu, chatLieu, onSave, onCancel }: {
   inModal?: boolean;
   editingSanPham: SanPhamItem | null;
   danhMuc: DanhMuc[];
   thuongHieu: ThuongHieu[];
+  chatLieu: ChatLieu[];
   onSave: () => void;
   onCancel: () => void;
 }) {
   // --- product info ---
   const [form, setForm] = useState({
-    tenSanPham: '', moTaChiTiet: '', giaGoc: '', danhMucId: '', thuongHieuId: '', trangThai: true,
+    tenSanPham: '', moTaChiTiet: '', giaGoc: '', danhMucId: '', thuongHieuId: '', chatLieuId: '', trangThai: true,
   });
   const [saving, setSaving] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -1026,6 +969,7 @@ function SanPhamForm({ inModal = false, editingSanPham, danhMuc, thuongHieu, onS
           giaGoc: sp.giaGoc != null ? String(sp.giaGoc) : '',
           danhMucId: sp.danhMuc?.id ? String(sp.danhMuc.id) : '',
           thuongHieuId: sp.thuongHieu?.id ? String(sp.thuongHieu.id) : '',
+          chatLieuId: sp.chatLieu?.id ? String(sp.chatLieu.id) : '',
           trangThai: sp.trangThaiSanPham === 'DANG_BAN',
         });
         setSavedProductId(sp.id);
@@ -1053,6 +997,7 @@ function SanPhamForm({ inModal = false, editingSanPham, danhMuc, thuongHieu, onS
         giaGoc: Number(form.giaGoc),
         danhMucId: form.danhMucId ? Number(form.danhMucId) : null,
         thuongHieuId: form.thuongHieuId ? Number(form.thuongHieuId) : null,
+        chatLieuId: form.chatLieuId ? Number(form.chatLieuId) : null,
         trangThai: form.trangThai,
       };
       if (savedProductId) {
@@ -1128,6 +1073,14 @@ function SanPhamForm({ inModal = false, editingSanPham, danhMuc, thuongHieu, onS
               onChange={e => setForm({ ...form, thuongHieuId: e.target.value })}>
               <option value="">-- Chọn --</option>
               {thuongHieu.map(th => <option key={th.id} value={th.id}>{th.tenThuongHieu}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Chất liệu</label>
+            <select className="input-field" value={form.chatLieuId}
+              onChange={e => setForm({ ...form, chatLieuId: e.target.value })}>
+              <option value="">-- Chọn --</option>
+              {chatLieu.map(cl => <option key={cl.id} value={cl.id}>{cl.tenChatLieu}</option>)}
             </select>
           </div>
           <div>

@@ -7,12 +7,12 @@ import {
 import { useAuthStore } from '../stores/authStore';
 
 const navItems = [
-  { to: '/quan-ly', label: 'Thống kê doanh thu', icon: LayoutDashboard, end: true },
+  { to: '/quan-ly', label: 'Thống kê', icon: LayoutDashboard, end: true },
   { to: '/quan-ly/san-pham', label: 'Sản phẩm', icon: Package },
-  { to: '/quan-ly/ban-hang', label: 'Bán hàng tại quầy', icon: ShoppingCart },
   { to: '/quan-ly/don-hang', label: 'Đơn hàng', icon: ShoppingCart },
-  { to: '/quan-ly/nguoi-dung', label: 'Người dùng', icon: Users },
+  { to: '/quan-ly/nguoi-dung', label: 'Khách hàng', icon: Users },
   { to: '/quan-ly/thuoc-tinh', label: 'Thuộc tính', icon: Tags },
+  { to: '/quan-ly/voucher', label: 'Voucher', icon: Ticket },
 ];
 
 export default function AdminLayout() {
@@ -26,9 +26,9 @@ export default function AdminLayout() {
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-gray-700">
           {!collapsed && (
-            <p className="text-white font-bold text-lg">
+            <Link to="/" className="text-white font-bold text-lg">
               Certain<span className="text-indigo-400">Shop</span>
-            </p>
+            </Link>
           )}
           <button onClick={() => setCollapsed(!collapsed)} className="text-gray-400 hover:text-white p-1 rounded">
             {collapsed ? <Menu className="w-5 h-5" /> : <X className="w-5 h-5" />}
