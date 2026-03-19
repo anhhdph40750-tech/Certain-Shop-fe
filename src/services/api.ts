@@ -501,6 +501,8 @@ export const adminApi = {
     trangThai: "DA_HUY",
     ghiChu
   }),
+  layHang: (maDonHang: string) =>
+  api.post(`/quan-ly/don-hang/lay-hang?maDonHang=${maDonHang}`)
 };
 
 // ===================== THUỘC TÍNH (ADMIN) =====================
