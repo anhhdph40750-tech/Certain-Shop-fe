@@ -6,7 +6,8 @@ import type { DonHang } from '../../services/api';
 import { formatCurrency, formatDate, trangThaiDonHangLabel, getImageUrl, handleImgError } from '../../utils/format';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
-
+import QRCode from "react-qr-code";
+import { Html5Qrcode } from "html5-qrcode";
 const TRANG_THAI_OPTIONS = [
   { value: '', label: 'Tất cả' },
   { value: 'CHO_THANH_TOAN', label: 'Chờ thanh toán' },
@@ -39,12 +40,12 @@ export default function QuanLyDonHangPage() {
   const [tuKhoa, setTuKhoa] = useState('');
   const [trangThai, setTrangThai] = useState('');
   const [trang, setTrang] = useState(0);
-const [sort, setSort] = useState<'asc' | 'desc'>('desc');
+  const [sort, setSort] = useState<'asc' | 'desc'>('desc');
   const [tongTrang, setTongTrang] = useState(0);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [chiTietDonHang, setChiTietDonHang] = useState<DonHang | null>(null);
   const [modalDonHang, setModalDonHang] = useState<DonHang | null>(null);
-   const [xacNhanHuy, setXacNhanHuy] = useState<DonHang | null>(null);
+  const [xacNhanHuy, setXacNhanHuy] = useState<DonHang | null>(null);
 
 
   // Confirm dialog state for Staff transition
@@ -53,15 +54,48 @@ const [sort, setSort] = useState<'asc' | 'desc'>('desc');
   });
 
   const { isAdmin } = useAuthStore();
+  const startScan = () => {
+  const scanner = new Html5Qrcode("reader");
+
+  scanner.start(
+    { facingMode: "environment" },
+    {
+      fps: 10,
+      qrbox: 250
+    },
+    (decodedText) => {
+
+      // khi quét được QR
+      setScanModal((prev) => ({
+        ...prev,
+        input: decodedText
+      }));
+
+      scanner.stop();
+    },
+    (error) => {
+      console.log(error);
+    }
+  );
+};
+  const [scanModal, setScanModal] = useState<{
+    show: boolean;
+    maDonHang: string;
+    input: string;
+  }>({
+    show: false,
+    maDonHang: "",
+    input: ""
+  });
 
   const load = useCallback(() => {
     setLoading(true);
-    adminApi.danhSachDonHang({ 
-  trangThai: trangThai || undefined, 
-  tuKhoa: tuKhoa || undefined, 
-  trang,
-   sort
-})
+    adminApi.danhSachDonHang({
+      trangThai: trangThai || undefined,
+      tuKhoa: tuKhoa || undefined,
+      trang,
+      sort
+    })
       .then(r => {
         setDanhSach(r.data.duLieu?.danhSach || []);
         setTongTrang(r.data.duLieu?.tongSoTrang || 0);
@@ -96,13 +130,22 @@ const [sort, setSort] = useState<'asc' | 'desc'>('desc');
   };
 
   const chuyenTrangThai = async (maDonHang: string, trangThaiMoi: string, ghiChu = '') => {
-    // Staff phải confirm, Admin không cần
+
+    // Nếu chuyển sang ĐANG_GIAO → mở popup quét QR
+    if (trangThaiMoi === "DANG_GIAO") {
+      setScanModal({
+        show: true,
+        maDonHang,
+        input: ""
+      });
+      return;
+    }
+
     if (!isAdmin()) {
       setConfirmDialog({ show: true, maDonHang, trangThaiMoi, ghiChu });
       return;
     }
 
-    // Admin không cần confirm, execute ngay
     await executeChuyenTrangThai(maDonHang, trangThaiMoi, ghiChu);
   };
 
@@ -132,16 +175,16 @@ const [sort, setSort] = useState<'asc' | 'desc'>('desc');
             value={tuKhoa} onChange={e => { setTuKhoa(e.target.value); setTrang(0); }} />
         </div>
         <select
-  className="input-field w-40 text-sm"
-  value={sort}
-  onChange={(e) => {
-    setSort(e.target.value as 'asc' | 'desc');
-    setTrang(0);
-  }}
->
-  <option value="desc">Mới nhất</option>
-  <option value="asc">Cũ nhất</option>
-</select>
+          className="input-field w-40 text-sm"
+          value={sort}
+          onChange={(e) => {
+            setSort(e.target.value as 'asc' | 'desc');
+            setTrang(0);
+          }}
+        >
+          <option value="desc">Mới nhất</option>
+          <option value="asc">Cũ nhất</option>
+        </select>
         <select className="input-field w-44 text-sm" value={trangThai}
           onChange={e => { setTrangThai(e.target.value); setTrang(0); }}>
           {TRANG_THAI_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -214,19 +257,19 @@ const [sort, setSort] = useState<'asc' | 'desc'>('desc');
                           </button>
                         )}
 
-                         {[
+                        {[
                           "CHO_XAC_NHAN",
                           "DA_XAC_NHAN",
                           "DANG_XU_LY",
                           "DANG_GIAO",
                         ].includes(dh.trangThaiDonHang) && (
-                          <button
-                            onClick={() => setXacNhanHuy(dh)}
-                            className="text-xs px-3 py-1 bg-red-50 text-red-500 rounded hover:bg-red-100"
-                          >
-                            Hủy
-                          </button>
-                        )}
+                            <button
+                              onClick={() => setXacNhanHuy(dh)}
+                              className="text-xs px-3 py-1 bg-red-50 text-red-500 rounded hover:bg-red-100"
+                            >
+                              Hủy
+                            </button>
+                          )}
                       </div>
                     </td>
 
@@ -272,6 +315,7 @@ const [sort, setSort] = useState<'asc' | 'desc'>('desc');
               <div>
                 <h2 className="text-lg font-bold text-white">Chi tiết đơn hàng</h2>
                 <p className="text-sm text-indigo-100">#{modalDonHang.maDonHang}</p>
+               
               </div>
               <button
                 onClick={() => setModalDonHang(null)}
@@ -421,6 +465,76 @@ const [sort, setSort] = useState<'asc' | 'desc'>('desc');
         </div>
       )}
 
+      {scanModal.show && (
+
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+
+          <div className="bg-white p-6 rounded-xl w-96 space-y-4">
+
+            <h3 className="text-lg font-semibold">
+              Quét QR / Nhập mã đơn
+            </h3>
+
+            <p className="text-sm text-gray-500">
+              Đơn cần giao: <b>{scanModal.maDonHang}</b>
+               <QRCode value={scanModal.maDonHang} size={120} />
+                <button
+    onClick={startScan}
+    className="px-3 py-2 bg-green-600 text-white rounded"
+  >
+    Quét QR
+  </button>
+            </p>
+
+            <input
+              type="text"
+              placeholder="Nhập hoặc quét mã đơn"
+              value={scanModal.input}
+              onChange={(e) => setScanModal({ ...scanModal, input: e.target.value })}
+              className="border rounded px-3 py-2 w-full"
+            />
+            <div id="reader" className="w-full mt-3"></div>
+
+            <div className="flex justify-end gap-3">
+
+              <button
+                onClick={() => setScanModal({ show: false, maDonHang: "", input: "" })}
+                className="px-3 py-2 border rounded"
+              >
+                Hủy
+              </button>
+
+              <button
+                onClick={async () => {
+
+                  if (scanModal.input !== scanModal.maDonHang) {
+                    toast.error("Sai mã đơn");
+                    return;
+                  }
+
+                  await executeChuyenTrangThai(
+                    scanModal.maDonHang,
+                    "DANG_GIAO"
+                  );
+
+                  setScanModal({
+                    show: false,
+                    maDonHang: "",
+                    input: ""
+                  });
+
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded"
+              >
+                Xác nhận giao
+              </button>
+
+            </div>
+
+          </div>
+        </div>
+      )}
+
       {/* Staff Confirm Dialog */}
       {confirmDialog.show && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 rounded-lg">
@@ -472,31 +586,31 @@ const [sort, setSort] = useState<'asc' | 'desc'>('desc');
               </button>
 
               <button
-  onClick={async () => {
-    try {
+                onClick={async () => {
+                  try {
 
-      await adminApi.huyDonHang(
-        xacNhanHuy.maDonHang
-      );
+                    await adminApi.huyDonHang(
+                      xacNhanHuy.maDonHang
+                    );
 
-      toast.success("Đã hủy đơn hàng");
+                    toast.success("Đã hủy đơn hàng");
 
-      load();
+                    load();
 
-    } catch (err: any) {
+                  } catch (err: any) {
 
-      toast.error(
-        err?.response?.data?.thongBao || "Hủy đơn thất bại"
-      );
+                    toast.error(
+                      err?.response?.data?.thongBao || "Hủy đơn thất bại"
+                    );
 
-    }
+                  }
 
-    setXacNhanHuy(null);
-  }}
-  className="px-4 py-2 text-sm bg-red-500 text-white rounded hover:bg-red-600"
->
-  Xác nhận hủy
-</button>
+                  setXacNhanHuy(null);
+                }}
+                className="px-4 py-2 text-sm bg-red-500 text-white rounded hover:bg-red-600"
+              >
+                Xác nhận hủy
+              </button>
 
             </div>
 
