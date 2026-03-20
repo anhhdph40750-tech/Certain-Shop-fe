@@ -8,9 +8,11 @@ import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import QRCode from "react-qr-code";
 import { Html5Qrcode } from "html5-qrcode";
+import InvoicePrint from "../../components/InvoicePrint";
 const TRANG_THAI_OPTIONS = [
   { value: '', label: 'Tất cả' },
   { value: 'CHO_THANH_TOAN', label: 'Chờ thanh toán' },
+  { value: 'DA_THANH_TOAN', label: 'Đã thanh toán' },
   { value: 'CHO_XAC_NHAN', label: 'Chờ xác nhận' },
   { value: 'DA_XAC_NHAN', label: 'Đã xác nhận' },
   { value: 'DANG_XU_LY', label: 'Đang xử lý' },
@@ -34,6 +36,7 @@ const getStatusDisplay = (trangThai: string): { label: string; color: string } =
   return trangThaiDonHangLabel[trangThai] || { label: trangThai, color: 'gray' };
 };
 
+
 export default function QuanLyDonHangPage() {
   const [danhSach, setDanhSach] = useState<DonHang[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +49,7 @@ export default function QuanLyDonHangPage() {
   const [chiTietDonHang, setChiTietDonHang] = useState<DonHang | null>(null);
   const [modalDonHang, setModalDonHang] = useState<DonHang | null>(null);
   const [xacNhanHuy, setXacNhanHuy] = useState<DonHang | null>(null);
+  const [invoiceModal, setInvoiceModal] = useState<DonHang | null>(null);
 
 
   // Confirm dialog state for Staff transition
@@ -55,29 +59,29 @@ export default function QuanLyDonHangPage() {
 
   const { isAdmin } = useAuthStore();
   const startScan = () => {
-  const scanner = new Html5Qrcode("reader");
+    const scanner = new Html5Qrcode("reader");
 
-  scanner.start(
-    { facingMode: "environment" },
-    {
-      fps: 10,
-      qrbox: 250
-    },
-    (decodedText) => {
+    scanner.start(
+      { facingMode: "environment" },
+      {
+        fps: 10,
+        qrbox: 250
+      },
+      (decodedText) => {
 
-      // khi quét được QR
-      setScanModal((prev) => ({
-        ...prev,
-        input: decodedText
-      }));
+        // khi quét được QR
+        setScanModal((prev) => ({
+          ...prev,
+          input: decodedText
+        }));
 
-      scanner.stop();
-    },
-    (error) => {
-      console.log(error);
-    }
-  );
-};
+        scanner.stop();
+      },
+      (error) => {
+        console.log(error);
+      }
+    );
+  };
   const [scanModal, setScanModal] = useState<{
     show: boolean;
     maDonHang: string;
@@ -282,6 +286,17 @@ export default function QuanLyDonHangPage() {
                       >
                         <Eye className="w-4 h-4" />
                       </button>
+                      {/* ✅ ICON PRINT */}
+                      <button
+                        onClick={async () => {
+                          const r = await adminApi.chiTietDonHang(dh.maDonHang);
+                          setInvoiceModal(r.data.duLieu);
+                        }}
+                        className="p-1 text-green-600 hover:text-green-700 hover:bg-green-50 rounded"
+                        title="In hóa đơn"
+                      >
+                        🧾
+                      </button>
                     </td>
                   </tr>
                 );
@@ -306,6 +321,19 @@ export default function QuanLyDonHangPage() {
         </div>
       )}
 
+      {invoiceModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-auto">
+
+            <InvoicePrint
+              donHang={invoiceModal}
+              onClose={() => setInvoiceModal(null)}
+            />
+
+          </div>
+        </div>
+      )}
+
       {/* Modal Chi Tiết Đơn Hàng - Popup ở giữa màn hình */}
       {modalDonHang && (
         <div className="fixed inset-0 flex items-center justify-center p-4 z-50 pointer-events-none">
@@ -315,7 +343,7 @@ export default function QuanLyDonHangPage() {
               <div>
                 <h2 className="text-lg font-bold text-white">Chi tiết đơn hàng</h2>
                 <p className="text-sm text-indigo-100">#{modalDonHang.maDonHang}</p>
-               
+
               </div>
               <button
                 onClick={() => setModalDonHang(null)}
@@ -477,13 +505,13 @@ export default function QuanLyDonHangPage() {
 
             <p className="text-sm text-gray-500">
               Đơn cần giao: <b>{scanModal.maDonHang}</b>
-               <QRCode value={scanModal.maDonHang} size={120} />
-                <button
-    onClick={startScan}
-    className="px-3 py-2 bg-green-600 text-white rounded"
-  >
-    Quét QR
-  </button>
+              <QRCode value={scanModal.maDonHang} size={120} />
+              <button
+                onClick={startScan}
+                className="px-3 py-2 bg-green-600 text-white rounded"
+              >
+                Quét QR
+              </button>
             </p>
 
             <input
