@@ -78,38 +78,123 @@ export default function QuanLyVoucherPage() {
   const parseNumber = (value: string) => {
     if (!value.trim()) return null;
     const n = Number(value);
-    return Number.isNaN(n) ? null : n;
+    return Number.isNaN(n) || !Number.isFinite(n) ? null : n;
   };
 
   const save = async () => {
-    if (!form.maVoucher.trim()) {
+    const maVoucherTrim = form.maVoucher.trim();
+    if (!maVoucherTrim) {
       toast.error('Nhập mã voucher');
+      return;
+    }
+    if (maVoucherTrim.length > 50) {
+      toast.error('Mã voucher không được vượt quá 50 ký tự');
       return;
     }
     if (!form.ngayBatDau || !form.ngayKetThuc) {
       toast.error('Chọn ngày bắt đầu và kết thúc');
       return;
     }
-    if (!form.giaTriGiam.trim()) {
-      toast.error('Nhập giá trị giảm');
+    const ngayBatDauTs = new Date(form.ngayBatDau).getTime();
+    const ngayKetThucTs = new Date(form.ngayKetThuc).getTime();
+    if (!Number.isFinite(ngayBatDauTs) || !Number.isFinite(ngayKetThucTs) || ngayBatDauTs >= ngayKetThucTs) {
+      toast.error('Ngày bắt đầu phải trước ngày kết thúc');
       return;
     }
-    if (!form.giaTriGiamToiDa.trim()) {
-      toast.error('Nhập giá trị giảm tối đa');
+    if (ngayKetThucTs <= Date.now()) {
+      toast.error('Ngày kết thúc không được ở quá khứ');
       return;
     }
 
+    const giaTriToiThieu = parseNumber(form.giaTriToiThieu);
+    const giaTriGiam = parseNumber(form.giaTriGiam);
+    const giaTriGiamToiDa = parseNumber(form.giaTriGiamToiDa);
+    const soLuongToiDa = parseNumber(form.soLuongToiDa);
+
+    // Validate inputs that are provided but not parseable/finite
+    if (form.giaTriToiThieu.trim() && giaTriToiThieu == null) {
+      toast.error('Giá trị đơn hàng tối thiểu không hợp lệ');
+      return;
+    }
+    if (form.loaiGiam === 'PERCENT' && form.giaTriGiam.trim() && giaTriGiam == null) {
+      toast.error('Giá trị giảm không hợp lệ');
+      return;
+    }
+    if (form.giaTriGiamToiDa.trim() && giaTriGiamToiDa == null) {
+      toast.error('Giá trị giảm tối đa (đ) không hợp lệ');
+      return;
+    }
+    if (form.soLuongToiDa.trim() && soLuongToiDa == null) {
+      toast.error('Số lần sử dụng tối đa không hợp lệ');
+      return;
+    }
+
+    // Disallow negative values
+    if (giaTriToiThieu != null && giaTriToiThieu < 0) {
+      toast.error('Giá trị đơn hàng tối thiểu không được âm');
+      return;
+    }
+    if (soLuongToiDa != null && soLuongToiDa < 0) {
+      toast.error('Số lần sử dụng tối đa không được âm');
+      return;
+    }
+    if (soLuongToiDa != null && !Number.isInteger(soLuongToiDa)) {
+      toast.error('Số lần sử dụng tối đa phải là số nguyên');
+      return;
+    }
+    if (form.loaiGiam === 'PERCENT' && giaTriGiam != null && giaTriGiam < 0) {
+      toast.error('Giá trị giảm không được âm');
+      return;
+    }
+    if (giaTriGiamToiDa != null && giaTriGiamToiDa < 0) {
+      toast.error('Giá trị giảm tối đa không được âm');
+      return;
+    }
+
+    // Validate by type + fix mapping for FIXED
+    let giaTriGiamFinal: number | null = giaTriGiam;
+    let giaTriGiamToiDaFinal: number | null = giaTriGiamToiDa;
+    if (form.loaiGiam === 'PERCENT') {
+      if (giaTriGiamFinal == null) {
+        toast.error('Nhập giá trị giảm (%)');
+        return;
+      }
+      if (giaTriGiamToiDaFinal == null) {
+        toast.error('Nhập giá trị giảm tối đa (đ)');
+        return;
+      }
+      if (giaTriGiamToiDaFinal <= 0) {
+        toast.error('Giá trị giảm tối đa (đ) phải lớn hơn 0');
+        return;
+      }
+      if (giaTriGiamFinal <= 0 || giaTriGiamFinal > 100) {
+        toast.error('Giá trị giảm (%) phải từ 1 đến 100');
+        return;
+      }
+    } else {
+      // FIXED: lấy số tiền cố định từ ô "Giá trị giảm tối đa (đ)"
+      if (giaTriGiamToiDaFinal == null) {
+        toast.error('Nhập giá trị giảm tối đa (đ)');
+        return;
+      }
+      if (giaTriGiamToiDaFinal <= 0) {
+        toast.error('Giá trị giảm (đ) phải lớn hơn 0');
+        return;
+      }
+      giaTriGiamFinal = giaTriGiamToiDaFinal;
+    }
+
     const payload = {
-      maVoucher: form.maVoucher.trim(),
+      maVoucher: maVoucherTrim,
       moTa: form.moTa.trim(),
       trangThai: form.trangThai,
       ngayBatDau: form.ngayBatDau,
       ngayKetThuc: form.ngayKetThuc,
-      giaTriToiThieu: parseNumber(form.giaTriToiThieu),
+      giaTriToiThieu,
       loaiGiam: form.loaiGiam,
-      giaTriGiam: parseNumber(form.giaTriGiam) ?? 0,
-      giaTriGiamToiDa: parseNumber(form.giaTriGiamToiDa) ?? 0,
-      soLuongToiDa: parseNumber(form.soLuongToiDa),
+      giaTriGiam: giaTriGiamFinal ?? 0,
+      giaTriGiamToiDa: giaTriGiamToiDaFinal ?? 0,
+      soLuongToiDa,
     };
 
     try {
@@ -289,7 +374,8 @@ export default function QuanLyVoucherPage() {
                 type="number"
                 className="input-field"
                 placeholder={form.loaiGiam === 'PERCENT' ? 'Ví dụ: 10' : 'Ví dụ: 50000'}
-                value={form.giaTriGiam}
+                value={form.loaiGiam === 'FIXED' ? form.giaTriGiamToiDa : form.giaTriGiam}
+                disabled={form.loaiGiam === 'FIXED'}
                 onChange={e => setForm(f => ({ ...f, giaTriGiam: e.target.value }))}
               />
             </div>
