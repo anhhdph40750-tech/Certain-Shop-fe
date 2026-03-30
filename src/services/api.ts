@@ -61,14 +61,51 @@ export interface User {
 /** Trả từ admin /quan-ly/nguoi-dung — serialize từ NguoiDung entity */
 export interface NguoiDungAdmin {
   id: number;
+  maNguoiDung: string;
   tenDangNhap: string;
   hoTen: string;
   email: string;
   soDienThoai: string;
-  trangThai: string;        // "HOAT_DONG" | ...
+  cccd?: string;
+  ngaySinh?: string;
+  gioiTinh?: boolean | null;
+  anhDaiDien?: string;
+  trangThai: string;
   dangHoatDong: boolean;
   thoiGianTao: string;
   vaiTro: { id: number; tenVaiTro: string } | null;
+  danhSachDiaChi?: {
+    id: number;
+    tinhThanh: string;
+    quanHuyen: string;
+    phuongXa: string;
+    diaChiDong1: string;
+    laMacDinh: boolean;
+    maTinhGHN?: number;
+    maHuyenGHN?: number;
+    maXaGHN?: string;
+  }[];
+}
+
+export interface TaoNhanVienPayload {
+  tenDangNhap: string;
+  matKhau: string;
+  hoTen: string;
+  email: string;
+  soDienThoai?: string;
+  cccd?: string;
+  ngaySinh?: string;
+  gioiTinh?: boolean | null;
+  anhDaiDien?: string;
+  vaiTroId?: number;
+  // địa chỉ
+  tinhThanh?: string;
+  quanHuyen?: string;
+  phuongXa?: string;
+  diaChiCuThe?: string;
+  maTinhGHN?: number;
+  maHuyenGHN?: number;
+  maXaGHN?: string;
 }
 
 /** Sản phẩm tóm tắt (từ list endpoints) - fields từ toSanPhamSummary backend */
@@ -237,7 +274,7 @@ export const authApi = {
 
 export const sanPhamApi = {
   /** GET /san-pham → { danhSach, tongSoTrang, tongSoBan, trangHienTai } */
-  danhSach: (params?: { tuKhoa?: string; danhMucId?: number; thuongHieuId?: number; trang?: number; kichThuocTrang?: number }) =>
+   danhSach: (params?: { tuKhoa?: string; danhMucId?: number; thuongHieuId?: number; trang?: number; kichThuocTrang?: number }) =>
     api.get<ApiResponse<{ danhSach: SanPhamItem[]; tongSoTrang: number; tongSoBan: number; trangHienTai: number }>>('/san-pham', { params }),
 
   /** GET /san-pham/{duongDan} → SanPhamDetail (có moTa + bienThe) */
@@ -424,7 +461,7 @@ export const adminApi = {
 
   // --- Đơn hàng admin ---
   /** GET /quan-ly/don-hang → { danhSach, tongSoTrang, tongSoBan, trangHienTai } */
-  danhSachDonHang: (params?: { trang?: number; kichThuocTrang?: number; trangThai?: string; tuKhoa?: string }) =>
+   danhSachDonHang: (params?: { trang?: number; kichThuocTrang?: number; trangThai?: string; tuKhoa?: string; sort?: 'asc'| 'desc' }) =>
     api.get<ApiResponse<{ danhSach: DonHang[]; tongSoTrang: number; tongSoBan: number }>>('/quan-ly/don-hang', { params }),
 
   /** GET /quan-ly/don-hang/{maDonHang} */
@@ -451,6 +488,20 @@ export const adminApi = {
 
   xoaSanPham: (id: number) =>
     api.delete<ApiResponse<null>>(`/quan-ly/san-pham/${id}`),
+
+  toggleTrangThaiSanPham: (id: number) =>
+    api.put<ApiResponse<string>>(`/quan-ly/san-pham/${id}/trang-thai`),
+
+  xuatExcelSanPham: () =>
+    api.get<Blob>('/quan-ly/san-pham/xuat-excel', { responseType: 'blob' }),
+
+  nhapExcelSanPham: (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return api.post<ApiResponse<null>>('/quan-ly/san-pham/nhap-excel', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 
   taoBienThe: (sanPhamId: number, data: unknown) =>
     api.post<ApiResponse<unknown>>(`/quan-ly/san-pham/${sanPhamId}/bien-the`, data),
@@ -483,11 +534,13 @@ export const adminApi = {
     api.get<ApiResponse<SanPhamDetail>>(`/san-pham/${duongDan}`),
 
   // --- Người dùng admin ---
-  /** GET /quan-ly/nguoi-dung → { nguoiDung, tongSo, tongTrang, trang }
-   *  Serialize từ NguoiDung entity: id, tenDangNhap, hoTen, email, soDienThoai, trangThai, dangHoatDong, thoiGianTao, vaiTro{id,tenVaiTro}
-   */
-  danhSachNguoiDung: (params?: { tuKhoa?: string; trang?: number; tenVaiTro?: string }) =>
+  /** GET /quan-ly/nguoi-dung → { nguoiDung, tongSo, tongTrang, trang } */
+  danhSachNguoiDung: (params?: { tuKhoa?: string; trang?: number; tenVaiTro?: string; trangThai?: string }) =>
     api.get<ApiResponse<{ nguoiDung: NguoiDungAdmin[]; tongSo: number; tongTrang: number }>>('/quan-ly/nguoi-dung', { params }),
+
+  /** GET /quan-ly/nguoi-dung/{id} — lấy chi tiết 1 người dùng (dùng cho trang edit) */
+  chiTietNguoiDung: (id: number) =>
+    api.get<ApiResponse<NguoiDungAdmin>>(`/quan-ly/nguoi-dung/${id}`),
 
   /** PUT /quan-ly/nguoi-dung/{id}/trang-thai — body: { dangHoatDong: boolean } */
   doiTrangThaiNguoiDung: (id: number, dangHoatDong: boolean) =>
@@ -496,6 +549,34 @@ export const adminApi = {
   /** PUT /quan-ly/nguoi-dung/{id}/vai-tro — body: { vaiTroId: number } (2=NV, 3=KH) */
   doiVaiTroNguoiDung: (id: number, vaiTroId: number) =>
     api.put<ApiResponse<null>>(`/quan-ly/nguoi-dung/${id}/vai-tro`, { vaiTroId }),
+
+  /** POST /quan-ly/nguoi-dung/nhan-vien — tạo nhân viên mới (đầy đủ thông tin) */
+  taoNhanVien: (data: TaoNhanVienPayload) =>
+    api.post<ApiResponse<NguoiDungAdmin>>('/quan-ly/nguoi-dung/nhan-vien', data),
+
+  /** PUT /quan-ly/nguoi-dung/{id} — cập nhật thông tin nhân viên */
+  capNhatNguoiDung: (id: number, data: Partial<TaoNhanVienPayload>) =>
+    api.put<ApiResponse<NguoiDungAdmin>>(`/quan-ly/nguoi-dung/${id}`, data),
+
+  /** DELETE /quan-ly/nguoi-dung/{id} — soft-delete */
+  xoaNguoiDung: (id: number) =>
+    api.delete<ApiResponse<null>>(`/quan-ly/nguoi-dung/${id}`),
+
+  /** POST /quan-ly/san-pham/upload-anh — upload ảnh đại diện */
+  uploadAnhDaiDien: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<ApiResponse<{ duongDan: string }>>('/quan-ly/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  huyDonHang: (maDonHang: string, ghiChu = "Admin/Nhân viên hủy đơn") =>
+  api.post(`/quan-ly/don-hang/${maDonHang}/cap-nhat-trang-thai`, {
+    trangThai: "DA_HUY",
+    ghiChu
+  }),
+  layHang: (maDonHang: string) =>
+  api.post(`/quan-ly/don-hang/lay-hang?maDonHang=${maDonHang}`)
 };
 
 // ===================== THUỘC TÍNH (ADMIN) =====================
@@ -514,6 +595,8 @@ export const voucherApi = {
     api.get<ApiResponse<{ maVoucher: string; giaTriGiam: number; giaTriSauGiam: number; hopLe: boolean }>>(
       `/voucher/tinh-giam?maVoucher=${maVoucher}&giaTriDonHang=${giaTriDonHang}`
     ),
+  danhSachChoDonHang: (tongTienHang: number) =>
+    api.get<ApiResponse<any[]>>(`/voucher/danh-sach-cho-don-hang`, { params: { tongTienHang } }),
 };
 
 export const thuocTinhApi = {

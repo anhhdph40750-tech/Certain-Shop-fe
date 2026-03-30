@@ -40,6 +40,7 @@ export default function QuanLyVoucherPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Voucher | null>(null);
   const [form, setForm] = useState<VoucherFormState>({ ...EMPTY_FORM });
+  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   const load = useCallback(() => {
     setLoading(true);
@@ -78,38 +79,123 @@ export default function QuanLyVoucherPage() {
   const parseNumber = (value: string) => {
     if (!value.trim()) return null;
     const n = Number(value);
-    return Number.isNaN(n) ? null : n;
+    return Number.isNaN(n) || !Number.isFinite(n) ? null : n;
   };
 
   const save = async () => {
-    if (!form.maVoucher.trim()) {
+    const maVoucherTrim = form.maVoucher.trim();
+    if (!maVoucherTrim) {
       toast.error('Nhập mã voucher');
+      return;
+    }
+    if (maVoucherTrim.length > 50) {
+      toast.error('Mã voucher không được vượt quá 50 ký tự');
       return;
     }
     if (!form.ngayBatDau || !form.ngayKetThuc) {
       toast.error('Chọn ngày bắt đầu và kết thúc');
       return;
     }
-    if (!form.giaTriGiam.trim()) {
-      toast.error('Nhập giá trị giảm');
+    const ngayBatDauTs = new Date(form.ngayBatDau).getTime();
+    const ngayKetThucTs = new Date(form.ngayKetThuc).getTime();
+    if (!Number.isFinite(ngayBatDauTs) || !Number.isFinite(ngayKetThucTs) || ngayBatDauTs >= ngayKetThucTs) {
+      toast.error('Ngày bắt đầu phải trước ngày kết thúc');
       return;
     }
-    if (!form.giaTriGiamToiDa.trim()) {
-      toast.error('Nhập giá trị giảm tối đa');
+    if (ngayKetThucTs <= Date.now()) {
+      toast.error('Ngày kết thúc không được ở quá khứ');
       return;
     }
 
+    const giaTriToiThieu = parseNumber(form.giaTriToiThieu);
+    const giaTriGiam = parseNumber(form.giaTriGiam);
+    const giaTriGiamToiDa = parseNumber(form.giaTriGiamToiDa);
+    const soLuongToiDa = parseNumber(form.soLuongToiDa);
+
+    // Validate inputs that are provided but not parseable/finite
+    if (form.giaTriToiThieu.trim() && giaTriToiThieu == null) {
+      toast.error('Giá trị đơn hàng tối thiểu không hợp lệ');
+      return;
+    }
+    if (form.loaiGiam === 'PERCENT' && form.giaTriGiam.trim() && giaTriGiam == null) {
+      toast.error('Giá trị giảm không hợp lệ');
+      return;
+    }
+    if (form.giaTriGiamToiDa.trim() && giaTriGiamToiDa == null) {
+      toast.error('Giá trị giảm tối đa (đ) không hợp lệ');
+      return;
+    }
+    if (form.soLuongToiDa.trim() && soLuongToiDa == null) {
+      toast.error('Số lần sử dụng tối đa không hợp lệ');
+      return;
+    }
+
+    // Disallow negative values
+    if (giaTriToiThieu != null && giaTriToiThieu < 0) {
+      toast.error('Giá trị đơn hàng tối thiểu không được âm');
+      return;
+    }
+    if (soLuongToiDa != null && soLuongToiDa < 0) {
+      toast.error('Số lần sử dụng tối đa không được âm');
+      return;
+    }
+    if (soLuongToiDa != null && !Number.isInteger(soLuongToiDa)) {
+      toast.error('Số lần sử dụng tối đa phải là số nguyên');
+      return;
+    }
+    if (form.loaiGiam === 'PERCENT' && giaTriGiam != null && giaTriGiam < 0) {
+      toast.error('Giá trị giảm không được âm');
+      return;
+    }
+    if (giaTriGiamToiDa != null && giaTriGiamToiDa < 0) {
+      toast.error('Giá trị giảm tối đa không được âm');
+      return;
+    }
+
+    // Validate by type + fix mapping for FIXED
+    let giaTriGiamFinal: number | null = giaTriGiam;
+    let giaTriGiamToiDaFinal: number | null = giaTriGiamToiDa;
+    if (form.loaiGiam === 'PERCENT') {
+      if (giaTriGiamFinal == null) {
+        toast.error('Nhập giá trị giảm (%)');
+        return;
+      }
+      if (giaTriGiamToiDaFinal == null) {
+        toast.error('Nhập giá trị giảm tối đa (đ)');
+        return;
+      }
+      if (giaTriGiamToiDaFinal <= 0) {
+        toast.error('Giá trị giảm tối đa (đ) phải lớn hơn 0');
+        return;
+      }
+      if (giaTriGiamFinal <= 0 || giaTriGiamFinal > 100) {
+        toast.error('Giá trị giảm (%) phải từ 1 đến 100');
+        return;
+      }
+    } else {
+      // FIXED: lấy số tiền cố định từ ô "Giá trị giảm tối đa (đ)"
+      if (giaTriGiamToiDaFinal == null) {
+        toast.error('Nhập giá trị giảm tối đa (đ)');
+        return;
+      }
+      if (giaTriGiamToiDaFinal <= 0) {
+        toast.error('Giá trị giảm (đ) phải lớn hơn 0');
+        return;
+      }
+      giaTriGiamFinal = giaTriGiamToiDaFinal;
+    }
+
     const payload = {
-      maVoucher: form.maVoucher.trim(),
+      maVoucher: maVoucherTrim,
       moTa: form.moTa.trim(),
       trangThai: form.trangThai,
       ngayBatDau: form.ngayBatDau,
       ngayKetThuc: form.ngayKetThuc,
-      giaTriToiThieu: parseNumber(form.giaTriToiThieu),
+      giaTriToiThieu,
       loaiGiam: form.loaiGiam,
-      giaTriGiam: parseNumber(form.giaTriGiam) ?? 0,
-      giaTriGiamToiDa: parseNumber(form.giaTriGiamToiDa) ?? 0,
-      soLuongToiDa: parseNumber(form.soLuongToiDa),
+      giaTriGiam: giaTriGiamFinal ?? 0,
+      giaTriGiamToiDa: giaTriGiamToiDaFinal ?? 0,
+      soLuongToiDa,
     };
 
     try {
@@ -128,15 +214,50 @@ export default function QuanLyVoucherPage() {
     }
   };
 
+  const toggleTrangThai = async (v: Voucher) => {
+    setConfirmModal({
+      isOpen: true,
+      title: v.trangThai ? 'Tạm dừng voucher' : 'Kích hoạt voucher',
+      message: `Bạn có chắc muốn ${v.trangThai ? 'tạm dừng' : 'kích hoạt'} voucher này?`,
+      onConfirm: async () => {
+        try {
+          const payload = {
+            maVoucher: v.maVoucher,
+            moTa: v.moTa || '',
+            trangThai: !v.trangThai,
+            ngayBatDau: v.ngayBatDau?.slice(0, 16) || '',
+            ngayKetThuc: v.ngayKetThuc?.slice(0, 16) || '',
+            giaTriToiThieu: v.giaTriToiThieu ?? null,
+            loaiGiam: v.loaiGiam,
+            giaTriGiam: v.giaTriGiam,
+            giaTriGiamToiDa: v.giaTriGiamToiDa,
+            soLuongToiDa: v.soLuongToiDa ?? null,
+          };
+          await voucherApi.capNhatVoucher(v.id, payload);
+          toast.success(`Đã ${!v.trangThai ? 'kích hoạt' : 'tạm dừng'} voucher`);
+          load();
+        } catch {
+          toast.error('Không thể cập nhật trạng thái');
+        }
+      }
+    });
+  };
+
   const xoa = async (id: number) => {
-    if (!confirm('Xóa (vô hiệu hóa) voucher này?')) return;
-    try {
-      await voucherApi.xoaVoucher(id);
-      toast.success('Đã xóa voucher');
-      load();
-    } catch {
-      toast.error('Không thể xóa voucher');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Xóa voucher',
+      message: 'Bạn có chắc chắn muốn xóa (vô hiệu hóa) voucher này?',
+      onConfirm: async () => {
+        try {
+          await voucherApi.xoaVoucher(id);
+          toast.success('Đã xóa voucher');
+          load();
+        } catch {
+          toast.error('Không thể xóa voucher');
+        }
+      }
+    });
   };
 
   if (loading) return <LoadingSpinner />;
@@ -289,7 +410,8 @@ export default function QuanLyVoucherPage() {
                 type="number"
                 className="input-field"
                 placeholder={form.loaiGiam === 'PERCENT' ? 'Ví dụ: 10' : 'Ví dụ: 50000'}
-                value={form.giaTriGiam}
+                value={form.loaiGiam === 'FIXED' ? form.giaTriGiamToiDa : form.giaTriGiam}
+                disabled={form.loaiGiam === 'FIXED'}
                 onChange={e => setForm(f => ({ ...f, giaTriGiam: e.target.value }))}
               />
             </div>
@@ -398,13 +520,46 @@ export default function QuanLyVoucherPage() {
                   {v.soLuongSuDung ?? 0} / {v.soLuongToiDa ?? '∞'}
                 </td>
                 <td className="px-4 py-3">
-                  <span
-                    className={`badge text-xs ${
-                      v.trangThai ? 'badge-green' : 'badge-gray'
-                    }`}
-                  >
-                    {v.trangThai ? 'Đang hoạt động' : 'Ngừng dùng'}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`px-2 py-1 flex items-center gap-1.5 rounded-full text-xs font-medium border ${
+                        new Date(v.ngayKetThuc).getTime() < Date.now()
+                          ? 'bg-red-50 text-red-600 border-red-200'
+                          : v.soLuongToiDa != null && v.soLuongSuDung >= v.soLuongToiDa
+                          ? 'bg-amber-50 text-amber-600 border-amber-200'
+                          : !v.trangThai
+                          ? 'bg-gray-50 text-gray-600 border-gray-200'
+                          : 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                      }`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        new Date(v.ngayKetThuc).getTime() < Date.now() ? 'bg-red-500' :
+                        v.soLuongToiDa != null && v.soLuongSuDung >= v.soLuongToiDa ? 'bg-amber-500' :
+                        !v.trangThai ? 'bg-gray-400' : 'bg-emerald-500'
+                      }`}></span>
+                      {new Date(v.ngayKetThuc).getTime() < Date.now()
+                        ? 'Hết hạn'
+                        : v.soLuongToiDa != null && v.soLuongSuDung >= v.soLuongToiDa
+                        ? 'Đã dùng hết'
+                        : v.trangThai
+                        ? 'Đang hoạt động'
+                        : 'Ngừng hoạt động'}
+                    </span>
+                    <button
+                      onClick={() => toggleTrangThai(v)}
+                      disabled={new Date(v.ngayKetThuc).getTime() < Date.now() || (v.soLuongToiDa != null && v.soLuongSuDung >= v.soLuongToiDa)}
+                      className={`text-[11px] px-2 py-0.5 rounded font-medium transition-colors border ${
+                        new Date(v.ngayKetThuc).getTime() < Date.now() || (v.soLuongToiDa != null && v.soLuongSuDung >= v.soLuongToiDa)
+                          ? 'bg-gray-50 text-gray-400 cursor-not-allowed border-transparent'
+                          : v.trangThai 
+                            ? 'text-red-600 border-transparent hover:bg-red-50 hover:border-red-200' 
+                            : 'text-indigo-600 border-transparent hover:bg-indigo-50 hover:border-indigo-200'
+                      }`}
+                      title={v.trangThai ? 'Tạm dừng voucher' : 'Kích hoạt voucher'}
+                    >
+                      {v.trangThai ? 'Tạm dừng' : 'Kích hoạt'}
+                    </button>
+                  </div>
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex gap-1 justify-end">
@@ -437,6 +592,34 @@ export default function QuanLyVoucherPage() {
           </tbody>
         </table>
       </div>
+
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-5">
+              <h3 className="text-lg font-bold text-gray-900">{confirmModal.title}</h3>
+              <p className="text-sm text-gray-500 mt-2">{confirmModal.message}</p>
+            </div>
+            <div className="flex bg-gray-50 p-3 gap-2 justify-end">
+              <button
+                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={() => {
+                  confirmModal.onConfirm();
+                  setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
