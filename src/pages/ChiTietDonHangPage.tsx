@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, MapPin, Clock } from 'lucide-react';
+import { ArrowLeft, MapPin } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { donHangApi } from '../services/api';
 import type { DonHang } from '../services/api';
@@ -13,11 +13,13 @@ const STEPS_VNPAY = ['CHO_THANH_TOAN', 'DA_THANH_TOAN', 'DANG_XU_LY', 'DANG_GIAO
 
 export default function ChiTietDonHangPage() {
   const { maDonHang } = useParams<{ maDonHang: string }>();
+  
   const [donHang, setDonHang] = useState<DonHang | null>(null);
   const [loading, setLoading] = useState(true);
   const [huyLoading, setHuyLoading] = useState(false);
   const [xacNhanLoading, setXacNhanLoading] = useState(false);
   const [showPrint, setShowPrint] = useState(false);
+  const [showHuyConfirm, setShowHuyConfirm] = useState(false);
 
   const load = () => {
     if (!maDonHang) return;
@@ -29,15 +31,23 @@ export default function ChiTietDonHangPage() {
 
   useEffect(() => { load(); }, [maDonHang]);
 
-  const huyDon = async () => {
-    if (!donHang || !confirm('Bạn có chắc muốn hủy đơn hàng này?')) return;
+  const huyDon = () => {
+    if (!donHang) return;
+    setShowHuyConfirm(true);
+  };
+
+  const xacNhanHuyDon = async () => {
+    if (!donHang) return;
+
+    setShowHuyConfirm(false);
     setHuyLoading(true);
+
     try {
       await donHangApi.huyDon(donHang.maDonHang);
-      toast.success('Đã hủy đơn hàng');
+      toast.success('Đã hủy đơn hàng thành công');
       load();
     } catch {
-      toast.error('Không thể hủy đơn hàng');
+      toast.error('Không thể hủy đơn hàng. Vui lòng thử lại sau');
     } finally {
       setHuyLoading(false);
     }
@@ -62,8 +72,6 @@ export default function ChiTietDonHangPage() {
 
   const tt = trangThaiDonHangLabel[donHang.trangThaiDonHang] || { label: donHang.trangThaiDonHang, color: 'gray' };
   const steps = donHang.phuongThucThanhToan === 'VNPAY' ? STEPS_VNPAY : STEPS_COD;
-  const currentStep = steps.indexOf(donHang.trangThaiDonHang);
-  const isHuy = donHang.trangThaiDonHang === 'DA_HUY';
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -79,36 +87,9 @@ export default function ChiTietDonHangPage() {
         <span className={`badge badge-${tt.color} text-sm px-3 py-1`}>{tt.label}</span>
       </div>
 
-      {/* Progress tracker */}
-      {/* {!isHuy && currentStep >= 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 p-6 mb-6">
-          <div className="flex items-center">
-            {steps.map((step, idx) => {
-              const s = trangThaiDonHangLabel[step];
-              const done = idx <= currentStep;
-              const active = idx === currentStep;
-              return (
-                <div key={step} className="flex-1 flex items-center">
-                  <div className="flex flex-col items-center">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${done ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-400'} ${active ? 'ring-2 ring-indigo-300' : ''}`}>
-                      {done ? '✓' : idx + 1}
-                    </div>
-                    <span className={`text-xs mt-1 text-center w-16 ${active ? 'text-indigo-600 font-semibold' : done ? 'text-gray-700' : 'text-gray-400'}`}>{s?.label}</span>
-                  </div>
-                  {idx < steps.length - 1 && (
-                    <div className={`flex-1 h-1 mx-1 rounded ${idx < currentStep ? 'bg-indigo-600' : 'bg-gray-200'}`} />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )} */}
-
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Left */}
+        {/* Left - Sản phẩm */}
         <div className="md:col-span-2 space-y-6">
-          {/* Products */}
           <div className="bg-white rounded-xl border border-gray-100 p-6">
             <h2 className="font-semibold text-gray-900 mb-4">Sản phẩm</h2>
             <div className="divide-y divide-gray-50">
@@ -117,12 +98,17 @@ export default function ChiTietDonHangPage() {
                 const displayThanhTien = ct.thanhTien || donGia * ct.soLuong;
                 return (
                   <div key={ct.id} className="py-4 flex items-center gap-4">
-                    <img src={getImageUrl(ct.bienThe?.anhChinh)} alt={ct.bienThe?.tenSanPham}
+                    <img 
+                      src={getImageUrl(ct.bienThe?.anhChinh)} 
+                      alt={ct.bienThe?.tenSanPham}
                       className="w-16 h-16 rounded-lg object-cover border border-gray-100"
-                      onError={handleImgError} />
+                      onError={handleImgError} 
+                    />
                     <div className="flex-1">
-                      <Link to={ct.bienThe?.duongDanSanPham ? `/san-pham/${ct.bienThe.duongDanSanPham}` : '#'}
-                        className="font-medium text-gray-900 text-sm hover:text-indigo-600">
+                      <Link 
+                        to={ct.bienThe?.duongDanSanPham ? `/san-pham/${ct.bienThe.duongDanSanPham}` : '#'}
+                        className="font-medium text-gray-900 text-sm hover:text-indigo-600"
+                      >
                         {ct.bienThe?.tenSanPham}
                       </Link>
                       <div className="text-gray-500 text-xs mt-0.5 flex gap-2">
@@ -137,14 +123,10 @@ export default function ChiTietDonHangPage() {
               })}
             </div>
           </div>
-
-          {/* Status history */}
-          
         </div>
 
         {/* Right */}
         <div className="space-y-6">
-          {/* Shipping */}
           <div className="bg-white rounded-xl border border-gray-100 p-6">
             <h2 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
               <MapPin className="w-4 h-4" /> Giao hàng
@@ -154,7 +136,6 @@ export default function ChiTietDonHangPage() {
             <p className="text-sm text-gray-500 mt-1">{donHang.diaChiGiaoHang}</p>
           </div>
 
-          {/* Summary */}
           <div className="bg-white rounded-xl border border-gray-100 p-6">
             <h2 className="font-semibold text-gray-900 mb-4">Tổng tiền</h2>
             <div className="space-y-2 text-sm">
@@ -177,27 +158,63 @@ export default function ChiTietDonHangPage() {
                 <span className="text-indigo-600">{formatCurrency(donHang.tongTienThanhToan)}</span>
               </div>
             </div>
-          
           </div>
 
-          {/* Actions */}
+          {/* Nút Hủy đơn */}
           <div className="space-y-2">
-          
-            {donHang.trangThaiDonHang === 'CHO_XAC_NHAN' && (
-              <button onClick={huyDon} disabled={huyLoading}
-                className="btn-danger w-full">
+            {(donHang.trangThaiDonHang === 'DA_THANH_TOAN' ||
+              donHang.trangThaiDonHang === 'CHO_XAC_NHAN' ||
+              donHang.trangThaiDonHang === 'DA_XAC_NHAN'
+            ) && (
+              <button 
+                onClick={huyDon} 
+                disabled={huyLoading}
+                className="btn-danger w-full py-3"
+              >
                 {huyLoading ? 'Đang hủy...' : 'Hủy đơn hàng'}
-              </button>
-            )}
-            {donHang.trangThaiDonHang === 'DANG_GIAO' && (
-              <button onClick={xacNhanNhanHang} disabled={xacNhanLoading}
-                className="btn-primary w-full">
-                {xacNhanLoading ? 'Đang xử lý...' : 'Đã nhận được hàng'}
               </button>
             )}
           </div>
         </div>
       </div>
+
+      {/* ====================== POPUP GIỐNG HỆT ẢNH BẠN GỬI ====================== */}
+      {showHuyConfirm && (
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden">
+            
+            {/* Tiêu đề */}
+            <div className="p-6 pb-4">
+              <h3 className="text-lg font-semibold text-center">Xác nhận hủy đơn hàng</h3>
+            </div>
+
+            {/* Nội dung */}
+            <div className="px-6 pb-6 text-center">
+              <p className="text-gray-600 mb-1">Bạn có chắc muốn hủy đơn hàng này?</p>
+              <p className="text-sm text-gray-500">
+                Đơn: <span className="font-medium">#{donHang.maDonHang}</span>
+              </p>
+            </div>
+
+            {/* 2 nút ngang */}
+            <div className="flex border-t">
+              <button
+                onClick={() => setShowHuyConfirm(false)}
+                className="flex-1 py-4 text-gray-600 font-medium hover:bg-gray-100 active:bg-gray-200 transition-colors border-r"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={xacNhanHuyDon}
+                disabled={huyLoading}
+                className="flex-1 py-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium transition-colors disabled:opacity-70"
+              >
+                {huyLoading ? 'Đang xử lý...' : 'Xác nhận'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Print invoice modal */}
       {showPrint && donHang && (
@@ -205,7 +222,10 @@ export default function ChiTietDonHangPage() {
           <div className="bg-white rounded-2xl w-full h-[90vh] max-w-6xl overflow-hidden flex flex-col shadow-2xl">
             <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white border-b p-6 flex justify-between items-center flex-shrink-0">
               <h2 className="text-2xl font-bold">📋 In hóa đơn #{donHang.maDonHang}</h2>
-              <button onClick={() => setShowPrint(false)} className="text-white hover:bg-indigo-500 hover:rounded-full p-2 transition-colors text-3xl leading-none">
+              <button 
+                onClick={() => setShowPrint(false)} 
+                className="text-white hover:bg-indigo-500 hover:rounded-full p-2 transition-colors text-3xl leading-none"
+              >
                 ×
               </button>
             </div>

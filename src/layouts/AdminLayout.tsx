@@ -1,28 +1,33 @@
 import { useState } from 'react';
-import { NavLink, Outlet, Link } from 'react-router-dom';
+import { NavLink, Outlet, Link, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, Package, ShoppingCart, Users, Tags, Ticket,
-  Menu, X, LogOut
+  LayoutDashboard, Package, ShoppingCart, Tags, Ticket,
+  Menu, X, LogOut, Store, ChevronDown, UserCog
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 
 const navItems = [
   { to: '/quan-ly', label: 'Thống kê', icon: LayoutDashboard, end: true },
-  { to: '/quan-ly/san-pham', label: 'Sản phẩm', icon: Package },
-  { to: '/quan-ly/don-hang', label: 'Đơn hàng', icon: ShoppingCart },
-  { to: '/quan-ly/nguoi-dung', label: 'Khách hàng', icon: Users },
-  { to: '/quan-ly/thuoc-tinh', label: 'Thuộc tính', icon: Tags },
-  { to: '/quan-ly/voucher', label: 'Voucher', icon: Ticket },
+  { to: '/quan-ly/ban-hang', label: 'Bán hàng', icon: Store },
+  { to: '/quan-ly/don-hang', label: 'Quản lý hóa đơn', icon: ShoppingCart },
+  { to: '/quan-ly/san-pham', label: 'Quản lý sản phẩm', icon: Package },
+  { to: '/quan-ly/thuoc-tinh', label: 'Danh sách thuộc tính', icon: Tags },
+  { to: '/quan-ly/voucher', label: 'Quản lý giảm giá', icon: Ticket },
 ];
 
 export default function AdminLayout() {
   const [collapsed, setCollapsed] = useState(false);
+  const [taiKhoanOpen, setTaiKhoanOpen] = useState(true);
   const { user, logout } = useAuthStore();
+  const location = useLocation();
+
+  const isTaiKhoanActive = location.pathname.startsWith('/quan-ly/nguoi-dung')
+    || location.pathname.startsWith('/quan-ly/khach-hang');
 
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
-      <div className={`${collapsed ? 'w-16' : 'w-60'} bg-gray-900 flex flex-col transition-all duration-200 flex-shrink-0`}>
+      <div className={`${collapsed ? 'w-16' : 'w-60'} bg-gray-900 flex flex-col transition-all duration-200 shrink-0`}>
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-gray-700">
           {!collapsed && (
@@ -36,7 +41,7 @@ export default function AdminLayout() {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 py-4 space-y-1 px-2">
+        <nav className="flex-1 py-4 space-y-1 px-2 overflow-y-auto">
           {navItems.map(item => (
             <NavLink
               key={item.to}
@@ -48,16 +53,60 @@ export default function AdminLayout() {
                 }`
               }
             >
-              <item.icon className="w-5 h-5 flex-shrink-0" />
+              <item.icon className="w-5 h-5 shrink-0" />
               {!collapsed && <span>{item.label}</span>}
             </NavLink>
           ))}
+
+          {/* Quản lý tài khoản — có sub-menu */}
+          <div>
+            <button
+              onClick={() => !collapsed && setTaiKhoanOpen(o => !o)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm font-medium ${
+                isTaiKhoanActive ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+              }`}
+            >
+              <UserCog className="w-5 h-5 shrink-0" />
+              {!collapsed && (
+                <>
+                  <span className="flex-1 text-left">Quản lý tài khoản</span>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${taiKhoanOpen ? 'rotate-180' : ''}`} />
+                </>
+              )}
+            </button>
+
+            {!collapsed && taiKhoanOpen && (
+              <div className="ml-8 mt-1 space-y-0.5">
+                <NavLink
+                  to="/quan-ly/nguoi-dung"
+                  end
+                  className={({ isActive }) =>
+                    `block px-3 py-2 rounded-lg text-sm transition-colors ${
+                      isActive ? 'text-white bg-orange-500' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                    }`
+                  }
+                >
+                  Nhân viên
+                </NavLink>
+                <NavLink
+                  to="/quan-ly/khach-hang"
+                  className={({ isActive }) =>
+                    `block px-3 py-2 rounded-lg text-sm transition-colors ${
+                      isActive ? 'text-white bg-orange-500' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                    }`
+                  }
+                >
+                  Khách hàng
+                </NavLink>
+              </div>
+            )}
+          </div>
         </nav>
 
         {/* Bottom */}
         <div className="p-3 border-t border-gray-700 space-y-1">
           <button onClick={logout} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-red-400 hover:bg-gray-800 transition-colors text-sm">
-            <LogOut className="w-5 h-5 flex-shrink-0" />
+            <LogOut className="w-5 h-5 shrink-0" />
             {!collapsed && <span>Đăng xuất</span>}
           </button>
         </div>
@@ -66,13 +115,18 @@ export default function AdminLayout() {
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0">
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0">
           <h1 className="font-semibold text-gray-800">Quản lý</h1>
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
               <span className="text-indigo-600 font-semibold text-sm">{user?.hoTen?.[0] || 'A'}</span>
             </div>
-            <span className="text-sm text-gray-700 font-medium">{user?.hoTen}</span>
+            <div className="text-right">
+              <p className="text-sm text-gray-700 font-medium">{user?.hoTen}</p>
+              <p className="text-xs text-gray-400">
+                {user?.vaiTro === 'ADMIN' ? 'Quản trị viên' : 'Nhân viên'}
+              </p>
+            </div>
           </div>
         </header>
 

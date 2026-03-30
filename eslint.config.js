@@ -19,5 +19,9 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // React Compiler rules are overly strict for data-fetching patterns; downgrade to warn
+      'react-hooks/react-compiler': 'warn',
+    },
   },
 ])

@@ -1,10 +1,57 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Search, Plus, Edit2, Trash2, Eye, Upload, X, Layers } from 'lucide-react';
+import { Search, Plus, Edit2, Eye, Upload, X, Layers, AlertTriangle, Trash2, Download, UploadCloud } from 'lucide-react';
 import { adminApi, sanPhamApi, thuocTinhApi } from '../../services/api';
 import type { SanPhamItem, BienThe as BienTheType, DanhMuc, ThuongHieu, MauSac, KichThuoc, ChatLieu } from '../../services/api';
 import { formatCurrency, getImageUrl, trangThaiSanPhamLabel, handleImgError } from '../../utils/format';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
+
+/* ==================== CONFIRM MODAL CHUNG ==================== */
+interface ConfirmModalProps {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  description?: string;
+  confirmText?: string;
+  cancelText?: string;
+  variant?: 'danger' | 'warning' | 'success';
+  loading?: boolean;
+  children?: React.ReactNode;
+}
+
+function ConfirmModal({ open, onClose, onConfirm, title, description, confirmText = 'Xác nhận', cancelText = 'Hủy', variant = 'danger', loading, children }: ConfirmModalProps) {
+  if (!open) return null;
+  const colors = {
+    danger:  { bg: 'bg-red-50',     icon: 'bg-red-100 text-red-600',     btn: 'bg-red-500 hover:bg-red-600' },
+    warning: { bg: 'bg-amber-50',   icon: 'bg-amber-100 text-amber-600', btn: 'bg-amber-500 hover:bg-amber-600' },
+    success: { bg: 'bg-emerald-50', icon: 'bg-emerald-100 text-emerald-600', btn: 'bg-emerald-500 hover:bg-emerald-600' },
+  }[variant];
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-0 overflow-hidden animate-in" onClick={e => e.stopPropagation()}>
+        <div className={`px-6 pt-6 pb-4 flex flex-col items-center text-center ${colors.bg}`}>
+          <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${colors.icon}`}>
+            {variant === 'danger' ? <Trash2 className="w-6 h-6" /> : <AlertTriangle className="w-6 h-6" />}
+          </div>
+          <h3 className="text-base font-bold text-gray-900">{title}</h3>
+        </div>
+        <div className="px-6 py-4">
+          {children}
+          {description && <p className="text-sm text-gray-600">{description}</p>}
+        </div>
+        <div className="px-6 pb-5 flex gap-3">
+          <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+            {cancelText}
+          </button>
+          <button onClick={onConfirm} disabled={loading} className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors ${colors.btn} disabled:opacity-50`}>
+            {loading ? 'Đang xử lý...' : confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function QuanLySanPhamPage() {
   const [danhSach, setDanhSach] = useState<SanPhamItem[]>([]);
@@ -42,14 +89,21 @@ export default function QuanLySanPhamPage() {
     thuocTinhApi.danhSachChatLieu().then(r => setChatLieu(r.data.duLieu || []));
   }, []);
 
-  const xoa = async (id: number) => {
-    if (!confirm('Bạn có chắc muốn xóa sản phẩm này?')) return;
+  const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [confirmSP, setConfirmSP] = useState<SanPhamItem | null>(null);
+
+  const doToggle = async (sp: SanPhamItem) => {
+    const dangBan = sp.trangThaiSanPham === 'DANG_BAN';
+    setTogglingId(sp.id);
+    setConfirmSP(null);
     try {
-      await adminApi.xoaSanPham(id);
-      toast.success('Đã xóa sản phẩm');
+      const res = await adminApi.toggleTrangThaiSanPham(sp.id);
+      toast.success(res.data.thongBao || (dangBan ? 'Đã ngừng bán' : 'Đã mở bán'));
       load();
     } catch {
-      toast.error('Không thể xóa');
+      toast.error('Không thể đổi trạng thái');
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -102,6 +156,40 @@ export default function QuanLySanPhamPage() {
     }
   };
 
+  const [importing, setImporting] = useState(false);
+
+  const handleExport = async () => {
+    try {
+      const res = await adminApi.xuatExcelSanPham();
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `SanPhams_${Date.now()}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('Xuất file thành công');
+    } catch {
+      toast.error('Lỗi xuất file Excel');
+    }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setImporting(true);
+      await adminApi.nhapExcelSanPham(file);
+      toast.success('Nhập dữ liệu thành công!');
+      load();
+    } catch {
+      toast.error('Lỗi khi nhập dữ liệu từ file Excel');
+    } finally {
+      setImporting(false);
+      e.target.value = '';
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-4">
@@ -111,12 +199,29 @@ export default function QuanLySanPhamPage() {
             Tạo, cập nhật sản phẩm và quản lý biến thể/ảnh theo từng biến thể.
           </p>
         </div>
-        <button
-          onClick={() => { setEditingSanPham(null); setShowForm(true); }}
-          className="btn-primary flex items-center gap-2 text-sm shadow-sm"
-        >
-          <Plus className="w-4 h-4" /> Thêm sản phẩm
-        </button>
+        <div className="flex gap-2">
+          <label className={`btn-secondary flex items-center gap-2 text-sm shadow-sm cursor-pointer ${importing ? 'opacity-50' : 'border-indigo-200 text-indigo-700 hover:bg-indigo-50'} transition-colors`}>
+            {importing ? (
+              <div className="w-4 h-4 rounded-full border-2 border-indigo-600 border-t-transparent animate-spin"/>
+            ) : (
+              <UploadCloud className="w-4 h-4" />
+            )}
+            Nhập Excel
+            <input type="file" accept=".xlsx" className="hidden" onChange={handleImport} disabled={importing} />
+          </label>
+          <button
+            onClick={handleExport}
+            className="btn-secondary flex items-center gap-2 text-sm shadow-sm border-emerald-200 text-emerald-700 hover:bg-emerald-50 transition-colors"
+          >
+            <Download className="w-4 h-4" /> Xuất Excel
+          </button>
+          <button
+            onClick={() => { setEditingSanPham(null); setShowForm(true); }}
+            className="btn-primary flex items-center gap-2 text-sm shadow-sm"
+          >
+            <Plus className="w-4 h-4" /> Thêm sản phẩm
+          </button>
+        </div>
       </div>
 
       <div className="card p-4">
@@ -235,9 +340,25 @@ export default function QuanLySanPhamPage() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`badge badge-${sp.trangThaiSanPham === 'DANG_BAN' ? 'green' : sp.trangThaiSanPham === 'HET_HANG' ? 'red' : 'gray'} text-xs`}>
-                      {trangThaiSanPhamLabel[sp.trangThaiSanPham] || sp.trangThaiSanPham}
-                    </span>
+                    <button
+                      onClick={() => setConfirmSP(sp)}
+                      disabled={togglingId === sp.id}
+                      className="group flex items-center gap-2 cursor-pointer"
+                      title={sp.trangThaiSanPham === 'DANG_BAN' ? 'Bấm để ngừng bán' : 'Bấm để mở bán'}
+                    >
+                      <div className={`relative w-10 h-[22px] rounded-full transition-colors duration-200 ${
+                        sp.trangThaiSanPham === 'DANG_BAN' ? 'bg-emerald-500' : 'bg-gray-300'
+                      }`}>
+                        <div className={`absolute top-[2px] w-[18px] h-[18px] rounded-full bg-white shadow transition-transform duration-200 ${
+                          sp.trangThaiSanPham === 'DANG_BAN' ? 'translate-x-[20px]' : 'translate-x-[2px]'
+                        }`} />
+                      </div>
+                      <span className={`text-xs font-medium ${
+                        sp.trangThaiSanPham === 'DANG_BAN' ? 'text-emerald-600' : 'text-gray-400'
+                      }`}>
+                        {trangThaiSanPhamLabel[sp.trangThaiSanPham] || sp.trangThaiSanPham}
+                      </span>
+                    </button>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1.5">
@@ -258,12 +379,6 @@ export default function QuanLySanPhamPage() {
                         title="Quản lý biến thể"
                       >
                         <Layers className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => xoa(sp.id)}
-                        className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                        title="Xóa sản phẩm"
-                      >
-                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </td>
@@ -309,6 +424,77 @@ export default function QuanLySanPhamPage() {
             await loadBienTheData(selectedSanPham);
           }}
         />
+      )}
+
+      {/* Modal xác nhận đổi trạng thái */}
+      {confirmSP && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          onClick={() => setConfirmSP(null)}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-0 overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header with icon */}
+            <div className={`px-6 pt-6 pb-4 flex flex-col items-center text-center ${
+              confirmSP.trangThaiSanPham === 'DANG_BAN' ? 'bg-amber-50' : 'bg-emerald-50'
+            }`}>
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-3 ${
+                confirmSP.trangThaiSanPham === 'DANG_BAN'
+                  ? 'bg-amber-100 text-amber-600'
+                  : 'bg-emerald-100 text-emerald-600'
+              }`}>
+                <AlertTriangle className="w-7 h-7" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">
+                {confirmSP.trangThaiSanPham === 'DANG_BAN' ? 'Ngừng bán sản phẩm?' : 'Mở bán lại sản phẩm?'}
+              </h3>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-4">
+              <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 mb-3">
+                <img
+                  src={getImageUrl(confirmSP.anhChinh)}
+                  alt={confirmSP.tenSanPham}
+                  className="w-12 h-12 rounded-lg object-cover border border-gray-100"
+                  onError={handleImgError}
+                />
+                <div>
+                  <p className="font-semibold text-gray-900 text-sm">{confirmSP.tenSanPham}</p>
+                  <p className="text-xs text-gray-400">#{confirmSP.maSanPham}</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600">
+                {confirmSP.trangThaiSanPham === 'DANG_BAN'
+                  ? 'Sản phẩm sẽ không hiển thị cho khách hàng trên gian hàng. Bạn có thể mở bán lại bất cứ lúc nào.'
+                  : 'Sản phẩm sẽ được hiển thị lại trên gian hàng cho khách hàng mua sắm.'}
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="px-6 pb-5 flex gap-3">
+              <button
+                onClick={() => setConfirmSP(null)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={() => doToggle(confirmSP)}
+                disabled={togglingId === confirmSP.id}
+                className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors ${
+                  confirmSP.trangThaiSanPham === 'DANG_BAN'
+                    ? 'bg-amber-500 hover:bg-amber-600'
+                    : 'bg-emerald-500 hover:bg-emerald-600'
+                } disabled:opacity-50`}
+              >
+                {togglingId === confirmSP.id
+                  ? 'Đang xử lý...'
+                  : confirmSP.trangThaiSanPham === 'DANG_BAN' ? 'Xác nhận ngừng bán' : 'Xác nhận mở bán'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -360,6 +546,9 @@ function BienTheSanPhamModal({
   const [uploadingBTId, setUploadingBTId] = useState<number | null>(null);
   const [deletingAnhId, setDeletingAnhId] = useState<number | null>(null);
   const [editingBTId, setEditingBTId] = useState<number | null>(null);
+  // Confirm states
+  const [confirmDeleteBT, setConfirmDeleteBT] = useState<BienTheType | null>(null);
+  const [confirmDeleteImg, setConfirmDeleteImg] = useState<{ id: number; url: string } | null>(null);
   const [editBTForm, setEditBTForm] = useState<BienTheForm>({ ...EMPTY_BT });
 
   // Bulk selection → auto-generate combinations
@@ -384,9 +573,57 @@ function BienTheSanPhamModal({
 
   const handleSaveClick = async () => {
     if (!rows.length) return;
+
+    // Validate all rows before calling backend
+    const partialRow = rows.find(r =>
+      (r.kichThuocId && !r.mauSacId) || (!r.kichThuocId && r.mauSacId)
+    );
+    if (partialRow) {
+      toast.error('Mỗi biến thể cần đủ Size và Màu');
+      return;
+    }
+
+    const rowsToSave = rows.filter(r => r.kichThuocId && r.mauSacId);
+    if (rowsToSave.length === 0) {
+      toast.error('Chưa có biến thể hợp lệ để lưu');
+      return;
+    }
+
+    // Validate duplicates (Size + Màu) inside rowsToSave
+    const comboKeys = new Set<string>();
+    for (const r of rowsToSave) {
+      const key = `${r.kichThuocId}|${r.mauSacId}`;
+      if (comboKeys.has(key)) {
+        toast.error('Không được trùng tổ hợp Size + Màu trong cùng lần lưu');
+        return;
+      }
+      comboKeys.add(key);
+    }
+
+    // Validate default variant: allow only 1
+    const defaultCount = rowsToSave.filter(r => !!r.macDinh).length;
+    if (defaultCount > 1) {
+      toast.error('Chỉ được chọn tối đa 1 biến thể mặc định');
+      return;
+    }
+
+    for (const r of rowsToSave) {
+      const giaNum = Number(r.gia);
+      const slNum = Number(r.soLuongTon);
+
+      if (!Number.isFinite(giaNum) || giaNum <= 0) {
+        toast.error('Giá biến thể phải lớn hơn 0');
+        return;
+      }
+      if (!Number.isFinite(slNum) || slNum < 0) {
+        toast.error('Số lượng tồn không được âm');
+        return;
+      }
+    }
+
     setSaving(true);
     try {
-      await onSave(rows);
+      await onSave(rowsToSave);
       await onReload();
     } finally {
       setSaving(false);
@@ -409,6 +646,17 @@ function BienTheSanPhamModal({
   const generateCombinations = () => {
     if (pickSizes.length === 0 || pickColors.length === 0) {
       toast.error('Vui lòng chọn Size và Màu để tạo tổ hợp');
+      return;
+    }
+
+    const giaNum = Number(genGia);
+    const slNum = Number(genSoLuong);
+    if (!Number.isFinite(giaNum) || giaNum <= 0) {
+      toast.error('Giá phải lớn hơn 0');
+      return;
+    }
+    if (!Number.isFinite(slNum) || slNum < 0) {
+      toast.error('Số lượng không được âm');
       return;
     }
 
@@ -459,13 +707,29 @@ function BienTheSanPhamModal({
   };
 
   const updateVariant = async (bienTheId: number) => {
+    // Validate edit form before sending
+    if (!editBTForm.kichThuocId || !editBTForm.mauSacId) {
+      toast.error('Chọn đầy đủ Size và Màu trước khi lưu');
+      return;
+    }
+    const giaNum = Number(editBTForm.gia);
+    const slNum = Number(editBTForm.soLuongTon);
+    if (!Number.isFinite(giaNum) || giaNum <= 0) {
+      toast.error('Giá phải lớn hơn 0');
+      return;
+    }
+    if (!Number.isFinite(slNum) || slNum < 0) {
+      toast.error('Số lượng tồn không được âm');
+      return;
+    }
+
     try {
       await adminApi.capNhatBienThe(bienTheId, {
         kichThuocId: editBTForm.kichThuocId ? Number(editBTForm.kichThuocId) : null,
         mauSacId: editBTForm.mauSacId ? Number(editBTForm.mauSacId) : null,
         chatLieuId: null,
-        gia: editBTForm.gia ? Number(editBTForm.gia) : null,
-        soLuongTon: editBTForm.soLuongTon ? Number(editBTForm.soLuongTon) : 0,
+        gia: giaNum,
+        soLuongTon: slNum,
         macDinh: editBTForm.macDinh,
       });
       toast.success('Cập nhật biến thể thành công');
@@ -478,7 +742,7 @@ function BienTheSanPhamModal({
   };
 
   const deleteVariant = async (bienTheId: number) => {
-    if (!confirm('Xóa biến thể này?')) return;
+    setConfirmDeleteBT(null);
     try {
       await adminApi.xoaBienThe(bienTheId);
       toast.success('Đã xóa biến thể');
@@ -489,6 +753,24 @@ function BienTheSanPhamModal({
   };
 
   const handleImageUpload = async (bienTheId: number, file: File) => {
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    if (!file) {
+      toast.error('Chưa chọn file ảnh');
+      return;
+    }
+    if (!file.type || !file.type.startsWith('image/')) {
+      toast.error('File phải là ảnh (image/*)');
+      return;
+    }
+    if (file.size <= 0) {
+      toast.error('Ảnh không hợp lệ (rỗng)');
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error('Dung lượng ảnh không được vượt quá 5MB');
+      return;
+    }
+
     try {
       setUploadingBTId(bienTheId);
       const bt = bienTheDaCo.find(b => b.id === bienTheId);
@@ -504,6 +786,7 @@ function BienTheSanPhamModal({
   };
 
   const deleteImage = async (anhId: number) => {
+    setConfirmDeleteImg(null);
     try {
       setDeletingAnhId(anhId);
       await adminApi.xoaAnh(anhId);
@@ -773,7 +1056,7 @@ function BienTheSanPhamModal({
                               </button>
                               <button
                                 type="button"
-                                onClick={() => deleteVariant(bt.id)}
+                                onClick={() => setConfirmDeleteBT(bt)}
                                 className="px-2 py-1 text-[11px] rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
                               >
                                 Xóa
@@ -792,7 +1075,7 @@ function BienTheSanPhamModal({
                                 />
                                 <button
                                   type="button"
-                                  onClick={() => deleteImage(img.id)}
+                                  onClick={() => setConfirmDeleteImg({ id: img.id, url: img.duongDan })}
                                   disabled={deletingAnhId === img.id}
                                   className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-60"
                                   title="Xóa ảnh"
@@ -929,6 +1212,31 @@ function BienTheSanPhamModal({
           </button>
         </div>
       </div>
+
+      <ConfirmModal
+        open={!!confirmDeleteBT}
+        onClose={() => setConfirmDeleteBT(null)}
+        onConfirm={() => confirmDeleteBT && deleteVariant(confirmDeleteBT.id)}
+        title="Xóa biến thể?"
+        description={`Bạn có chắc muốn xóa biến thể ${confirmDeleteBT?.kichThuoc?.tenKichThuoc || ''} - ${confirmDeleteBT?.mauSac?.tenMauSac || ''}?`}
+        confirmText="Xác nhận xóa"
+      />
+
+      <ConfirmModal
+        open={!!confirmDeleteImg}
+        onClose={() => setConfirmDeleteImg(null)}
+        onConfirm={() => confirmDeleteImg && deleteImage(confirmDeleteImg.id)}
+        title="Xóa ảnh?"
+        description="Bạn có chắc muốn xóa ảnh này khỏi biến thể?"
+        confirmText="Xác nhận xóa"
+      >
+        {confirmDeleteImg && (
+          <div className="flex justify-center mb-4">
+            <img src={getImageUrl(confirmDeleteImg.url)} alt="" className="w-16 h-16 rounded-lg object-cover border border-gray-200" onError={handleImgError} />
+          </div>
+        )}
+      </ConfirmModal>
+
     </div>
   );
 }
@@ -989,15 +1297,39 @@ function SanPhamForm({ inModal = false, editingSanPham, danhMuc, thuongHieu, cha
       toast.error('Vui lòng chọn danh mục');
       return;
     }
+
+    const giaGocNum = Number(form.giaGoc);
+    if (!Number.isFinite(giaGocNum) || giaGocNum <= 0) {
+      toast.error('Giá gốc phải lớn hơn 0');
+      return;
+    }
+    const danhMucIdNum = Number(form.danhMucId);
+    if (!Number.isFinite(danhMucIdNum) || danhMucIdNum <= 0) {
+      toast.error('Danh mục không hợp lệ');
+      return;
+    }
+
+    const thuongHieuIdNum = form.thuongHieuId ? Number(form.thuongHieuId) : null;
+    if (thuongHieuIdNum != null && (!Number.isFinite(thuongHieuIdNum) || thuongHieuIdNum <= 0)) {
+      toast.error('Thương hiệu không hợp lệ');
+      return;
+    }
+
+    const chatLieuIdNum = form.chatLieuId ? Number(form.chatLieuId) : null;
+    if (chatLieuIdNum != null && (!Number.isFinite(chatLieuIdNum) || chatLieuIdNum <= 0)) {
+      toast.error('Chất liệu không hợp lệ');
+      return;
+    }
+
     setSaving(true);
     try {
       const data: Record<string, unknown> = {
         tenSanPham: form.tenSanPham.trim(),
         moTaChiTiet: form.moTaChiTiet,
-        giaGoc: Number(form.giaGoc),
-        danhMucId: form.danhMucId ? Number(form.danhMucId) : null,
-        thuongHieuId: form.thuongHieuId ? Number(form.thuongHieuId) : null,
-        chatLieuId: form.chatLieuId ? Number(form.chatLieuId) : null,
+        giaGoc: giaGocNum,
+        danhMucId: danhMucIdNum,
+        thuongHieuId: thuongHieuIdNum,
+        chatLieuId: chatLieuIdNum,
         trangThai: form.trangThai,
       };
       if (savedProductId) {
@@ -1102,7 +1434,7 @@ function SanPhamForm({ inModal = false, editingSanPham, danhMuc, thuongHieu, cha
             <button type="button" onClick={onCancel} className="btn-secondary text-sm">
               {isEditMode ? 'Đóng' : 'Hủy'}
             </button>
-            {isEditMode && (
+            {!editingSanPham && isEditMode && (
               <button type="button" onClick={onSave} className="btn-secondary text-sm ml-auto">
                 ✓ Hoàn tất
               </button>
