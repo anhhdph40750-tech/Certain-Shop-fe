@@ -161,6 +161,7 @@ export default function BanHangTaiQuayPage() {
       toast.error(err.response?.data?.thongBao || 'Lỗi khi hủy');
     }
   };
+  
 
   // ==== Tìm sản phẩm ====
   const handleProductSearch = (val: string) => {
@@ -627,22 +628,6 @@ export default function BanHangTaiQuayPage() {
 
           <hr className="border-slate-100" />
 
-          {/* Email receipt */}
-          <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5" /> Email biên lai <span className="text-[10px] font-normal normal-case text-slate-400">(không bắt buộc)</span>
-            </p>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
-              <input
-                type="email"
-                value={emailBienlai}
-                onChange={(e) => setEmailBienlai(e.target.value)}
-                placeholder="customer@email.com"
-                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none transition-all"
-              />
-            </div>
-          </div>
 
           <hr className="border-slate-100" />
 
@@ -703,12 +688,15 @@ export default function BanHangTaiQuayPage() {
                 </button>
               </div>
               <input
-                type="number"
-                value={amountPaid}
-                onChange={(e) => setAmountPaid(e.target.value)}
-                placeholder="0"
-                className="w-full px-4 py-2.5 bg-slate-900 text-white font-black text-xl rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 placeholder-slate-600"
-              />
+  type="number"
+  value={amountPaid}
+  onChange={(e) => setAmountPaid(e.target.value)}
+  placeholder="0"
+  className="w-full px-4 py-3 bg-white text-gray-900 font-black text-xl rounded-xl 
+             border border-gray-800 outline-none 
+             focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 
+             placeholder:text-gray-400"
+/>
               {tienThua > 0 && (
                 <div className="mt-2 flex justify-between items-center px-3 py-2 bg-emerald-50 rounded-xl border border-emerald-200">
                   <span className="text-emerald-700 font-bold text-sm">Tiền thừa</span>
