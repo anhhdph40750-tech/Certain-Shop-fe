@@ -1,10 +1,57 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Search, Plus, Edit2, Trash2, Eye, Upload, X, Layers } from 'lucide-react';
+import { Search, Plus, Edit2, Eye, Upload, X, Layers, AlertTriangle, Trash2, Download, UploadCloud, MoreVertical, Pencil } from 'lucide-react';
 import { adminApi, sanPhamApi, thuocTinhApi } from '../../services/api';
 import type { SanPhamItem, BienThe as BienTheType, DanhMuc, ThuongHieu, MauSac, KichThuoc, ChatLieu } from '../../services/api';
 import { formatCurrency, getImageUrl, trangThaiSanPhamLabel, handleImgError } from '../../utils/format';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
+
+/* ==================== CONFIRM MODAL CHUNG ==================== */
+interface ConfirmModalProps {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  description?: string;
+  confirmText?: string;
+  cancelText?: string;
+  variant?: 'danger' | 'warning' | 'success';
+  loading?: boolean;
+  children?: React.ReactNode;
+}
+
+function ConfirmModal({ open, onClose, onConfirm, title, description, confirmText = 'Xác nhận', cancelText = 'Hủy', variant = 'danger', loading, children }: ConfirmModalProps) {
+  if (!open) return null;
+  const colors = {
+    danger:  { bg: 'bg-red-50',     icon: 'bg-red-100 text-red-600',     btn: 'bg-red-500 hover:bg-red-600' },
+    warning: { bg: 'bg-amber-50',   icon: 'bg-amber-100 text-amber-600', btn: 'bg-amber-500 hover:bg-amber-600' },
+    success: { bg: 'bg-emerald-50', icon: 'bg-emerald-100 text-emerald-600', btn: 'bg-emerald-500 hover:bg-emerald-600' },
+  }[variant];
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-0 overflow-hidden animate-in" onClick={e => e.stopPropagation()}>
+        <div className={`px-6 pt-6 pb-4 flex flex-col items-center text-center ${colors.bg}`}>
+          <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${colors.icon}`}>
+            {variant === 'danger' ? <Trash2 className="w-6 h-6" /> : <AlertTriangle className="w-6 h-6" />}
+          </div>
+          <h3 className="text-base font-bold text-gray-900">{title}</h3>
+        </div>
+        <div className="px-6 py-4">
+          {children}
+          {description && <p className="text-sm text-gray-600">{description}</p>}
+        </div>
+        <div className="px-6 pb-5 flex gap-3">
+          <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+            {cancelText}
+          </button>
+          <button onClick={onConfirm} disabled={loading} className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors ${colors.btn} disabled:opacity-50`}>
+            {loading ? 'Đang xử lý...' : confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function QuanLySanPhamPage() {
   const [danhSach, setDanhSach] = useState<SanPhamItem[]>([]);
@@ -42,14 +89,21 @@ export default function QuanLySanPhamPage() {
     thuocTinhApi.danhSachChatLieu().then(r => setChatLieu(r.data.duLieu || []));
   }, []);
 
-  const xoa = async (id: number) => {
-    if (!confirm('Bạn có chắc muốn xóa sản phẩm này?')) return;
+  const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [confirmSP, setConfirmSP] = useState<SanPhamItem | null>(null);
+
+  const doToggle = async (sp: SanPhamItem) => {
+    const dangBan = sp.trangThaiSanPham === 'DANG_BAN';
+    setTogglingId(sp.id);
+    setConfirmSP(null);
     try {
-      await adminApi.xoaSanPham(id);
-      toast.success('Đã xóa sản phẩm');
+      const res = await adminApi.toggleTrangThaiSanPham(sp.id);
+      toast.success(res.data.thongBao || (dangBan ? 'Đã ngừng bán' : 'Đã mở bán'));
       load();
     } catch {
-      toast.error('Không thể xóa');
+      toast.error('Không thể đổi trạng thái');
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -59,7 +113,7 @@ export default function QuanLySanPhamPage() {
       const [ktRes, msRes, detailRes] = await Promise.all([
         thuocTinhApi.danhSachKichThuoc(),
         thuocTinhApi.danhSachMauSac(),
-        sanPhamApi.chiTiet(sp.duongDan),
+        adminApi.chiTietAdmin(sp.id),
       ]);
       setBtKichThuocOptions(ktRes.data.duLieu || []);
       setBtMauSacOptions(msRes.data.duLieu || []);
@@ -94,11 +148,45 @@ export default function QuanLySanPhamPage() {
       })));
       toast.success(`Đã lưu ${rows.length} biến thể`);
       if (selectedSanPham.duongDan) {
-        const detailRes = await sanPhamApi.chiTiet(selectedSanPham.duongDan);
+        const detailRes = await adminApi.chiTietAdmin(selectedSanPham.id);
         setBienTheModalList(detailRes.data.duLieu?.bienThe || []);
       }
     } catch {
       toast.error('Lỗi lưu biến thể');
+    }
+  };
+
+  const [importing, setImporting] = useState(false);
+
+  const handleExport = async () => {
+    try {
+      const res = await adminApi.xuatExcelSanPham();
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `SanPhams_${Date.now()}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('Xuất file thành công');
+    } catch {
+      toast.error('Lỗi xuất file Excel');
+    }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setImporting(true);
+      await adminApi.nhapExcelSanPham(file);
+      toast.success('Nhập dữ liệu thành công!');
+      load();
+    } catch {
+      toast.error('Lỗi khi nhập dữ liệu từ file Excel');
+    } finally {
+      setImporting(false);
+      e.target.value = '';
     }
   };
 
@@ -111,12 +199,29 @@ export default function QuanLySanPhamPage() {
             Tạo, cập nhật sản phẩm và quản lý biến thể/ảnh theo từng biến thể.
           </p>
         </div>
-        <button
-          onClick={() => { setEditingSanPham(null); setShowForm(true); }}
-          className="btn-primary flex items-center gap-2 text-sm shadow-sm"
-        >
-          <Plus className="w-4 h-4" /> Thêm sản phẩm
-        </button>
+        <div className="flex gap-2">
+          <label className={`btn-secondary flex items-center gap-2 text-sm shadow-sm cursor-pointer ${importing ? 'opacity-50' : 'border-indigo-200 text-indigo-700 hover:bg-indigo-50'} transition-colors`}>
+            {importing ? (
+              <div className="w-4 h-4 rounded-full border-2 border-indigo-600 border-t-transparent animate-spin"/>
+            ) : (
+              <UploadCloud className="w-4 h-4" />
+            )}
+            Nhập Excel
+            <input type="file" accept=".xlsx" className="hidden" onChange={handleImport} disabled={importing} />
+          </label>
+          <button
+            onClick={handleExport}
+            className="btn-secondary flex items-center gap-2 text-sm shadow-sm border-emerald-200 text-emerald-700 hover:bg-emerald-50 transition-colors"
+          >
+            <Download className="w-4 h-4" /> Xuất Excel
+          </button>
+          <button
+            onClick={() => { setEditingSanPham(null); setShowForm(true); }}
+            className="btn-primary flex items-center gap-2 text-sm shadow-sm"
+          >
+            <Plus className="w-4 h-4" /> Thêm sản phẩm
+          </button>
+        </div>
       </div>
 
       <div className="card p-4">
@@ -235,9 +340,25 @@ export default function QuanLySanPhamPage() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`badge badge-${sp.trangThaiSanPham === 'DANG_BAN' ? 'green' : sp.trangThaiSanPham === 'HET_HANG' ? 'red' : 'gray'} text-xs`}>
-                      {trangThaiSanPhamLabel[sp.trangThaiSanPham] || sp.trangThaiSanPham}
-                    </span>
+                    <button
+                      onClick={() => setConfirmSP(sp)}
+                      disabled={togglingId === sp.id}
+                      className="group flex items-center gap-2 cursor-pointer"
+                      title={sp.trangThaiSanPham === 'DANG_BAN' ? 'Bấm để ngừng bán' : 'Bấm để mở bán'}
+                    >
+                      <div className={`relative w-10 h-[22px] rounded-full transition-colors duration-200 ${
+                        sp.trangThaiSanPham === 'DANG_BAN' ? 'bg-emerald-500' : 'bg-gray-300'
+                      }`}>
+                        <div className={`absolute top-[2px] w-[18px] h-[18px] rounded-full bg-white shadow transition-transform duration-200 ${
+                          sp.trangThaiSanPham === 'DANG_BAN' ? 'translate-x-[20px]' : 'translate-x-[2px]'
+                        }`} />
+                      </div>
+                      <span className={`text-xs font-medium ${
+                        sp.trangThaiSanPham === 'DANG_BAN' ? 'text-emerald-600' : 'text-gray-400'
+                      }`}>
+                        {trangThaiSanPhamLabel[sp.trangThaiSanPham] || sp.trangThaiSanPham}
+                      </span>
+                    </button>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1.5">
@@ -258,12 +379,6 @@ export default function QuanLySanPhamPage() {
                         title="Quản lý biến thể"
                       >
                         <Layers className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => xoa(sp.id)}
-                        className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                        title="Xóa sản phẩm"
-                      >
-                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </td>
@@ -310,7 +425,276 @@ export default function QuanLySanPhamPage() {
           }}
         />
       )}
+
+      {/* Modal xác nhận đổi trạng thái */}
+      {confirmSP && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          onClick={() => setConfirmSP(null)}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-0 overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header with icon */}
+            <div className={`px-6 pt-6 pb-4 flex flex-col items-center text-center ${
+              confirmSP.trangThaiSanPham === 'DANG_BAN' ? 'bg-amber-50' : 'bg-emerald-50'
+            }`}>
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-3 ${
+                confirmSP.trangThaiSanPham === 'DANG_BAN'
+                  ? 'bg-amber-100 text-amber-600'
+                  : 'bg-emerald-100 text-emerald-600'
+              }`}>
+                <AlertTriangle className="w-7 h-7" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">
+                {confirmSP.trangThaiSanPham === 'DANG_BAN' ? 'Ngừng bán sản phẩm?' : 'Mở bán lại sản phẩm?'}
+              </h3>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-4">
+              <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 mb-3">
+                <img
+                  src={getImageUrl(confirmSP.anhChinh)}
+                  alt={confirmSP.tenSanPham}
+                  className="w-12 h-12 rounded-lg object-cover border border-gray-100"
+                  onError={handleImgError}
+                />
+                <div>
+                  <p className="font-semibold text-gray-900 text-sm">{confirmSP.tenSanPham}</p>
+                  <p className="text-xs text-gray-400">#{confirmSP.maSanPham}</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600">
+                {confirmSP.trangThaiSanPham === 'DANG_BAN'
+                  ? 'Sản phẩm sẽ không hiển thị cho khách hàng trên gian hàng. Bạn có thể mở bán lại bất cứ lúc nào.'
+                  : 'Sản phẩm sẽ được hiển thị lại trên gian hàng cho khách hàng mua sắm.'}
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="px-6 pb-5 flex gap-3">
+              <button
+                onClick={() => setConfirmSP(null)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={() => doToggle(confirmSP)}
+                disabled={togglingId === confirmSP.id}
+                className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors ${
+                  confirmSP.trangThaiSanPham === 'DANG_BAN'
+                    ? 'bg-amber-500 hover:bg-amber-600'
+                    : 'bg-emerald-500 hover:bg-emerald-600'
+                } disabled:opacity-50`}
+              >
+                {togglingId === confirmSP.id
+                  ? 'Đang xử lý...'
+                  : confirmSP.trangThaiSanPham === 'DANG_BAN' ? 'Xác nhận ngừng bán' : 'Xác nhận mở bán'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+// VariantRow - Inline Edit Component
+function VariantRow({
+  bt, kichThuocOptions, mauSacOptions, onReload, setConfirmDeleteBT,
+  handleImageUpload, deletingAnhId, uploadingBTId, setConfirmDeleteImg, cloneToDraft
+}: {
+  bt: BienTheType;
+  kichThuocOptions: KichThuoc[];
+  mauSacOptions: MauSac[];
+  onReload: () => Promise<void> | void;
+  setConfirmDeleteBT: (bt: BienTheType) => void;
+  handleImageUpload: (id: number, f: File) => Promise<void>;
+  deletingAnhId: number | null;
+  uploadingBTId: number | null;
+  setConfirmDeleteImg: (x: any) => void;
+  cloneToDraft: (bt: BienTheType) => void;
+}) {
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState<string>('');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [savingField, setSavingField] = useState(false);
+
+  const startEdit = (field: string, val: string) => {
+    setEditingField(field);
+    setEditValue(val);
+  };
+
+  const saveEdit = async () => {
+    if (!editingField || savingField) return;
+    let finalValue: any = editValue;
+    if (editingField === 'gia') {
+       finalValue = Number(editValue);
+       if (!finalValue || finalValue <= 0) { toast.error('Giá sai'); setEditingField(null); return; }
+       if (finalValue === bt.gia) { setEditingField(null); return; }
+    } else if (editingField === 'soLuongTon') {
+       finalValue = Number(editValue);
+       if (finalValue < 0 || isNaN(finalValue)) { toast.error('Số lượng sai'); setEditingField(null); return; }
+       if (finalValue === bt.soLuongTon) { setEditingField(null); return; }
+    } else if (editingField === 'kichThuocId') {
+       finalValue = Number(editValue);
+       if (finalValue === bt.kichThuoc?.id) { setEditingField(null); return; }
+    } else if (editingField === 'mauSacId') {
+       finalValue = Number(editValue);
+       if (finalValue === bt.mauSac?.id) { setEditingField(null); return; }
+    }
+
+    setSavingField(true);
+    try {
+      const payload: any = {
+        kichThuocId: editingField === 'kichThuocId' ? finalValue : (bt.kichThuoc?.id || null),
+        mauSacId: editingField === 'mauSacId' ? finalValue : (bt.mauSac?.id || null),
+        chatLieuId: null,
+        gia: editingField === 'gia' ? finalValue : bt.gia,
+        soLuongTon: editingField === 'soLuongTon' ? finalValue : bt.soLuongTon,
+        macDinh: bt.macDinh,
+        trangThai: bt.trangThai !== false
+      };
+      await adminApi.capNhatBienThe(bt.id, payload);
+      toast.success('Đã cập nhật');
+      await onReload();
+    } catch {
+      toast.error('Lỗi khi lưu');
+    } finally {
+      setSavingField(false);
+      setEditingField(null);
+    }
+  };
+
+  const toggleTrangThai = async () => {
+    try {
+      const current = bt.trangThai !== false;
+      const payload = {
+        kichThuocId: bt.kichThuoc?.id || null,
+        mauSacId: bt.mauSac?.id || null,
+        chatLieuId: null,
+        gia: bt.gia,
+        soLuongTon: bt.soLuongTon,
+        macDinh: bt.macDinh,
+        trangThai: !current
+      };
+      await adminApi.capNhatBienThe(bt.id, payload);
+      toast.success(!current ? 'Đã bật' : 'Đã ẩn (ngừng bán)');
+      await onReload();
+    } catch {
+      toast.error('Lỗi chuyển trạng thái');
+    }
+  };
+
+  const setMacDinh = async () => {
+    try {
+       const payload = {
+         kichThuocId: bt.kichThuoc?.id || null,
+         mauSacId: bt.mauSac?.id || null,
+         chatLieuId: null,
+         gia: bt.gia,
+         soLuongTon: bt.soLuongTon,
+         macDinh: true,
+         trangThai: bt.trangThai !== false
+       };
+       await adminApi.capNhatBienThe(bt.id, payload);
+       toast.success('Đã đặt làm mặc định');
+       setMenuOpen(false);
+       await onReload();
+    } catch {
+       toast.error('Lỗi đặt mặc định');
+    }
+  };
+
+  return (
+    <tr className="hover:bg-gray-50 group border-b border-gray-100">
+      <td className="px-3 py-2 text-gray-600">
+         #{bt.id}
+         {bt.macDinh && <span className="ml-2 badge badge-blue text-[9px] px-1 py-0 block w-fit mt-1">MĐ</span>}
+      </td>
+      {/* Kich Thuoc */}
+      <td className="px-3 py-2 cursor-pointer hover:bg-gray-100 relative group/cell" onClick={() => { if(editingField !== 'kichThuocId') startEdit('kichThuocId', String(bt.kichThuoc?.id||''))}}>
+        {editingField === 'kichThuocId' ? (
+           <select autoFocus className="input-field text-xs px-1 py-1 h-7 min-w-[70px]" value={editValue} onChange={e=>setEditValue(e.target.value)} onBlur={saveEdit}>
+             {kichThuocOptions.map(k => <option key={k.id} value={k.id}>{k.kichCo}</option>)}
+           </select>
+        ) : (
+           <div className="flex items-center gap-1">{(bt.kichThuoc?.kichCo || bt.kichThuoc?.tenKichThuoc) || '—'}<Pencil className="w-3 h-3 text-gray-300 opacity-0 group-hover/cell:opacity-100" /></div>
+        )}
+      </td>
+      {/* Mau Sac */}
+      <td className="px-3 py-2 cursor-pointer hover:bg-gray-100 relative group/cell" onClick={() => { if(editingField !== 'mauSacId') startEdit('mauSacId', String(bt.mauSac?.id||''))}}>
+        {editingField === 'mauSacId' ? (
+           <select autoFocus className="input-field text-xs px-1 py-1 h-7 min-w-[80px]" value={editValue} onChange={e=>setEditValue(e.target.value)} onBlur={saveEdit}>
+             {mauSacOptions.map(m => <option key={m.id} value={m.id}>{m.tenMau}</option>)}
+           </select>
+        ) : (
+           <div className="flex items-center gap-1">{(bt.mauSac?.tenMau || bt.mauSac?.tenMauSac) || '—'}<Pencil className="w-3 h-3 text-gray-300 opacity-0 group-hover/cell:opacity-100" /></div>
+        )}
+      </td>
+      {/* Gia */}
+      <td className="px-3 py-2 cursor-pointer hover:bg-gray-100 relative group/cell" onClick={() => { if(editingField !== 'gia') startEdit('gia', String(bt.gia))}}>
+        {editingField === 'gia' ? (
+           <input autoFocus type="number" className="input-field text-xs px-1 py-1 h-7 w-20" value={editValue} onChange={e=>setEditValue(e.target.value)} onBlur={saveEdit} onKeyDown={e=>e.key === 'Enter' && saveEdit()} />
+        ) : (
+           <div className="flex items-center gap-1 font-semibold text-indigo-600">{bt.gia != null ? formatCurrency(bt.gia) : '—'}<Pencil className="w-3 h-3 text-indigo-300 opacity-0 group-hover/cell:opacity-100" /></div>
+        )}
+      </td>
+      {/* So Luong Ton */}
+      <td className="px-3 py-2 cursor-pointer hover:bg-gray-100 relative group/cell" onClick={() => { if(editingField !== 'soLuongTon') startEdit('soLuongTon', String(bt.soLuongTon))}}>
+        {editingField === 'soLuongTon' ? (
+           <input autoFocus type="number" className="input-field text-xs px-1 py-1 h-7 w-16" value={editValue} onChange={e=>setEditValue(e.target.value)} onBlur={saveEdit} onKeyDown={e=>e.key === 'Enter' && saveEdit()} />
+        ) : (
+           <div className="flex items-center gap-1 text-gray-600">{bt.soLuongTon}<Pencil className="w-3 h-3 text-gray-300 opacity-0 group-hover/cell:opacity-100" /></div>
+        )}
+      </td>
+      {/* Trang thai toggle */}
+      <td className="px-3 py-2">
+        <label className="relative inline-flex items-center cursor-pointer mb-0">
+          <input type="checkbox" className="sr-only peer" checked={bt.trangThai !== false} onChange={toggleTrangThai} />
+          <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div>
+          <span className="ml-2 text-[10px] font-medium text-gray-700">{bt.trangThai !== false ? 'ON' : 'OFF'}</span>
+        </label>
+      </td>
+      {/* Hinh Anh */}
+      <td className="px-3 py-2">
+         <div className="flex flex-wrap gap-1 items-center">
+          {bt.hinhAnh?.map(img => (
+            <div key={img.id} className="relative group/img w-10 h-10">
+              {/* @ts-ignore */}
+              <img src={img.duongDan?.includes('/') ? img.duongDan : ('http://localhost:8080/api/files/' + img.duongDan)} alt="" className={`w-10 h-10 rounded-md object-cover border-2 ${img.laAnhChinh ? 'border-indigo-400' : 'border-gray-100'}`} onError={(e) => { e.currentTarget.src = '/img/no-image.png'; }} />
+              <button type="button" onClick={() => setConfirmDeleteImg({ id: img.id, url: img.duongDan })} disabled={deletingAnhId === img.id} className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity disabled:opacity-60" title="Xóa ảnh">
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+
+          <label className="w-10 h-10 rounded-md border-2 border-dashed border-gray-200 flex items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
+            {uploadingBTId === bt.id ? (
+              <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Upload className="w-4 h-4 text-gray-400" />
+            )}
+            <input type="file" accept="image/*" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (file) void handleImageUpload(bt.id, file); e.target.value = ''; }} />
+          </label>
+        </div>
+      </td>
+      {/* Action ... Menu */}
+      <td className="px-3 py-2 relative text-right">
+         <button onClick={(e) => setMenuOpen(!menuOpen)} onBlur={() => setTimeout(()=>setMenuOpen(false), 200)} className="text-gray-400 p-1.5 rounded-full hover:bg-gray-100 hover:text-gray-700">
+            <MoreVertical className="w-4 h-4" />
+         </button>
+         {menuOpen && (
+           <div className="absolute right-6 top-6 w-36 bg-white border border-gray-100 shadow-xl rounded-md overflow-hidden z-20 text-left py-1" onMouseDown={e=>e.preventDefault()}>
+             <button onClick={setMacDinh} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">Đặt làm mặc định</button>
+             <button onClick={() => cloneToDraft(bt)} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">Nhân bản</button>
+             <div className="border-t border-gray-100 my-1"></div>
+             <button onClick={() => { setConfirmDeleteBT(bt); setMenuOpen(false); }} className="block w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50">Xóa biến thể</button>
+           </div>
+         )}
+      </td>
+    </tr>
   );
 }
 
@@ -359,8 +743,9 @@ function BienTheSanPhamModal({
   const [saving, setSaving] = useState(false);
   const [uploadingBTId, setUploadingBTId] = useState<number | null>(null);
   const [deletingAnhId, setDeletingAnhId] = useState<number | null>(null);
-  const [editingBTId, setEditingBTId] = useState<number | null>(null);
-  const [editBTForm, setEditBTForm] = useState<BienTheForm>({ ...EMPTY_BT });
+  // Confirm states
+  const [confirmDeleteBT, setConfirmDeleteBT] = useState<BienTheType | null>(null);
+  const [confirmDeleteImg, setConfirmDeleteImg] = useState<{ id: number; url: string } | null>(null);
 
   // Bulk selection → auto-generate combinations
   const [pickSizes, setPickSizes] = useState<string[]>([]);
@@ -384,9 +769,57 @@ function BienTheSanPhamModal({
 
   const handleSaveClick = async () => {
     if (!rows.length) return;
+
+    // Validate all rows before calling backend
+    const partialRow = rows.find(r =>
+      (r.kichThuocId && !r.mauSacId) || (!r.kichThuocId && r.mauSacId)
+    );
+    if (partialRow) {
+      toast.error('Mỗi biến thể cần đủ Size và Màu');
+      return;
+    }
+
+    const rowsToSave = rows.filter(r => r.kichThuocId && r.mauSacId);
+    if (rowsToSave.length === 0) {
+      toast.error('Chưa có biến thể hợp lệ để lưu');
+      return;
+    }
+
+    // Validate duplicates (Size + Màu) inside rowsToSave
+    const comboKeys = new Set<string>();
+    for (const r of rowsToSave) {
+      const key = `${r.kichThuocId}|${r.mauSacId}`;
+      if (comboKeys.has(key)) {
+        toast.error('Không được trùng tổ hợp Size + Màu trong cùng lần lưu');
+        return;
+      }
+      comboKeys.add(key);
+    }
+
+    // Validate default variant: allow only 1
+    const defaultCount = rowsToSave.filter(r => !!r.macDinh).length;
+    if (defaultCount > 1) {
+      toast.error('Chỉ được chọn tối đa 1 biến thể mặc định');
+      return;
+    }
+
+    for (const r of rowsToSave) {
+      const giaNum = Number(r.gia);
+      const slNum = Number(r.soLuongTon);
+
+      if (!Number.isFinite(giaNum) || giaNum <= 0) {
+        toast.error('Giá biến thể phải lớn hơn 0');
+        return;
+      }
+      if (!Number.isFinite(slNum) || slNum < 0) {
+        toast.error('Số lượng tồn không được âm');
+        return;
+      }
+    }
+
     setSaving(true);
     try {
-      await onSave(rows);
+      await onSave(rowsToSave);
       await onReload();
     } finally {
       setSaving(false);
@@ -409,6 +842,17 @@ function BienTheSanPhamModal({
   const generateCombinations = () => {
     if (pickSizes.length === 0 || pickColors.length === 0) {
       toast.error('Vui lòng chọn Size và Màu để tạo tổ hợp');
+      return;
+    }
+
+    const giaNum = Number(genGia);
+    const slNum = Number(genSoLuong);
+    if (!Number.isFinite(giaNum) || giaNum <= 0) {
+      toast.error('Giá phải lớn hơn 0');
+      return;
+    }
+    if (!Number.isFinite(slNum) || slNum < 0) {
+      toast.error('Số lượng không được âm');
       return;
     }
 
@@ -447,48 +891,50 @@ function BienTheSanPhamModal({
     setFn(prev => (prev.includes(value) ? prev.filter((x: string) => x !== value) : [...prev, value]));
   };
 
-  const startEditVariant = (bt: BienTheType) => {
-    setEditingBTId(bt.id);
-    setEditBTForm({
+  const cloneToDraft = (bt: BienTheType) => {
+    setRows(prev => [{
       kichThuocId: bt.kichThuoc?.id != null ? String(bt.kichThuoc.id) : '',
       mauSacId: bt.mauSac?.id != null ? String(bt.mauSac.id) : '',
       gia: bt.gia != null ? String(bt.gia) : '',
       soLuongTon: bt.soLuongTon != null ? String(bt.soLuongTon) : '0',
-      macDinh: !!bt.macDinh,
-    });
+      macDinh: false,
+    }, ...prev]);
+    toast.success('Đã đưa bản sao vào danh sách tạo (trên cùng).');
   };
 
-  const updateVariant = async (bienTheId: number) => {
-    try {
-      await adminApi.capNhatBienThe(bienTheId, {
-        kichThuocId: editBTForm.kichThuocId ? Number(editBTForm.kichThuocId) : null,
-        mauSacId: editBTForm.mauSacId ? Number(editBTForm.mauSacId) : null,
-        chatLieuId: null,
-        gia: editBTForm.gia ? Number(editBTForm.gia) : null,
-        soLuongTon: editBTForm.soLuongTon ? Number(editBTForm.soLuongTon) : 0,
-        macDinh: editBTForm.macDinh,
-      });
-      toast.success('Cập nhật biến thể thành công');
-      setEditingBTId(null);
-      await onReload();
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { thongBao?: string } } })?.response?.data?.thongBao || 'Lỗi cập nhật biến thể';
-      toast.error(msg);
-    }
-  };
+
 
   const deleteVariant = async (bienTheId: number) => {
-    if (!confirm('Xóa biến thể này?')) return;
+    setConfirmDeleteBT(null);
     try {
       await adminApi.xoaBienThe(bienTheId);
       toast.success('Đã xóa biến thể');
       await onReload();
-    } catch {
-      toast.error('Lỗi xóa biến thể');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { thongBao?: string } } })?.response?.data?.thongBao || 'Lỗi xóa biến thể';
+      toast.error(msg);
     }
   };
 
   const handleImageUpload = async (bienTheId: number, file: File) => {
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    if (!file) {
+      toast.error('Chưa chọn file ảnh');
+      return;
+    }
+    if (!file.type || !file.type.startsWith('image/')) {
+      toast.error('File phải là ảnh (image/*)');
+      return;
+    }
+    if (file.size <= 0) {
+      toast.error('Ảnh không hợp lệ (rỗng)');
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error('Dung lượng ảnh không được vượt quá 5MB');
+      return;
+    }
+
     try {
       setUploadingBTId(bienTheId);
       const bt = bienTheDaCo.find(b => b.id === bienTheId);
@@ -504,6 +950,7 @@ function BienTheSanPhamModal({
   };
 
   const deleteImage = async (anhId: number) => {
+    setConfirmDeleteImg(null);
     try {
       setDeletingAnhId(anhId);
       await adminApi.xoaAnh(anhId);
@@ -725,196 +1172,50 @@ function BienTheSanPhamModal({
                   Đang tải dữ liệu biến thể...
                 </div>
               ) : (
+                <>
                 <table className="w-full text-xs">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-3 py-2 text-left text-gray-500">ID</th>
                       <th className="px-3 py-2 text-left text-gray-500">Kích thước</th>
                       <th className="px-3 py-2 text-left text-gray-500">Màu sắc</th>
-                      <th className="px-3 py-2 text-left text-gray-500">Chất liệu</th>
                       <th className="px-3 py-2 text-left text-gray-500">Giá</th>
                       <th className="px-3 py-2 text-left text-gray-500">Số lượng</th>
-                      <th className="px-3 py-2 text-left text-gray-500">Mặc định</th>
-                      <th className="px-3 py-2 text-left text-gray-500">Thao tác</th>
+                      <th className="px-3 py-2 text-left text-gray-500">Trạng thái</th>
                       <th className="px-3 py-2 text-left text-gray-500">Ảnh</th>
+                      <th className="px-3 py-2 text-center text-gray-500 w-10">⋯</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {bienTheDaCo.map(bt => (
-                      <>
-                        <tr key={bt.id} className="hover:bg-gray-50">
-                          <td className="px-3 py-2 text-gray-600">{bt.id}</td>
-                          <td className="px-3 py-2">
-                            {bt.kichThuoc?.tenKichThuoc || '—'}
-                          </td>
-                          <td className="px-3 py-2">
-                            {bt.mauSac?.tenMauSac || '—'}
-                          </td>
-                          <td className="px-3 py-2">
-                            {bt.chatLieu?.tenChatLieu || '—'}
-                          </td>
-                          <td className="px-3 py-2 font-semibold text-indigo-600">
-                            {bt.gia != null ? formatCurrency(bt.gia) : '—'}
-                          </td>
-                          <td className="px-3 py-2 text-gray-600">
-                            {bt.soLuongTon}
-                          </td>
-                          <td className="px-3 py-2">
-                            {bt.macDinh ? (
-                              <span className="badge badge-blue text-[11px]">Mặc định</span>
-                            ) : (
-                              <span className="text-[11px] text-gray-400">Không</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2">
-                            <div className="flex gap-1">
-                              <button
-                                type="button"
-                                onClick={() => startEditVariant(bt)}
-                                className="px-2 py-1 text-[11px] rounded border border-gray-200 text-gray-600 hover:border-indigo-400 hover:text-indigo-700 transition-colors"
-                              >
-                                Sửa
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => deleteVariant(bt.id)}
-                                className="px-2 py-1 text-[11px] rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
-                              >
-                                Xóa
-                              </button>
-                            </div>
-                          </td>
-                          <td className="px-3 py-2">
-                          <div className="flex flex-wrap gap-1 items-center">
-                            {bt.hinhAnh?.map(img => (
-                              <div key={img.id} className="relative group w-10 h-10">
-                                <img
-                                  src={getImageUrl(img.duongDan)}
-                                  alt=""
-                                  className={`w-10 h-10 rounded-md object-cover border-2 ${img.laAnhChinh ? 'border-indigo-400' : 'border-gray-100'}`}
-                                  onError={handleImgError}
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => deleteImage(img.id)}
-                                  disabled={deletingAnhId === img.id}
-                                  className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-60"
-                                  title="Xóa ảnh"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                                {img.laAnhChinh && (
-                                  <span className="absolute bottom-0 left-0 right-0 bg-indigo-500 text-white text-center text-[8px] rounded-b-md">
-                                    Chính
-                                  </span>
-                                )}
-                              </div>
-                            ))}
-
-                            <label className="w-10 h-10 rounded-md border-2 border-dashed border-gray-200 flex items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
-                              {uploadingBTId === bt.id ? (
-                                <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-                              ) : (
-                                <Upload className="w-4 h-4 text-gray-400" />
-                              )}
-                              <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={e => {
-                                  const file = e.target.files?.[0];
-                                  if (file) void handleImageUpload(bt.id, file);
-                                  e.target.value = '';
-                                }}
-                              />
-                            </label>
-                          </div>
-                          </td>
-                        </tr>
-                        {editingBTId === bt.id && (
-                          <tr>
-                            <td colSpan={9} className="px-3 py-2 bg-indigo-50/40">
-                              <div className="grid grid-cols-3 md:grid-cols-7 gap-2 items-end">
-                                <select
-                                  className="input-field text-xs"
-                                  value={editBTForm.kichThuocId}
-                                  onChange={e => setEditBTForm(prev => ({ ...prev, kichThuocId: e.target.value }))}
-                                >
-                                  <option value="">Kích thước</option>
-                                  {kichThuocOptions.map(k => (
-                                    <option key={k.id} value={k.id}>
-                                      {k.kichCo}
-                                    </option>
-                                  ))}
-                                </select>
-                                <select
-                                  className="input-field text-xs"
-                                  value={editBTForm.mauSacId}
-                                  onChange={e => setEditBTForm(prev => ({ ...prev, mauSacId: e.target.value }))}
-                                >
-                                  <option value="">Màu sắc</option>
-                                  {mauSacOptions.map(m => (
-                                    <option key={m.id} value={m.id}>
-                                      {m.tenMau}
-                                    </option>
-                                  ))}
-                                </select>
-                                <input
-                                  type="number"
-                                  className="input-field text-xs"
-                                  placeholder="Giá"
-                                  value={editBTForm.gia}
-                                  onChange={e => setEditBTForm(prev => ({ ...prev, gia: e.target.value }))}
-                                />
-                                <input
-                                  type="number"
-                                  className="input-field text-xs"
-                                  placeholder="Số lượng"
-                                  value={editBTForm.soLuongTon}
-                                  onChange={e => setEditBTForm(prev => ({ ...prev, soLuongTon: e.target.value }))}
-                                />
-                                <label className="flex items-center gap-1 text-[11px] text-gray-600">
-                                  <input
-                                    type="checkbox"
-                                    checked={editBTForm.macDinh}
-                                    onChange={e => setEditBTForm(prev => ({ ...prev, macDinh: e.target.checked }))}
-                                  />
-                                  Mặc định
-                                </label>
-                                <div className="flex gap-2 justify-end">
-                                  <button
-                                    type="button"
-                                    onClick={() => updateVariant(bt.id)}
-                                    className="btn-primary text-xs px-3 py-2"
-                                  >
-                                    Lưu
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setEditingBTId(null)}
-                                    className="btn-secondary text-xs px-3 py-2"
-                                  >
-                                    Hủy
-                                  </button>
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </>
+                      <VariantRow
+                        key={bt.id}
+                        bt={bt}
+                        kichThuocOptions={kichThuocOptions}
+                        mauSacOptions={mauSacOptions}
+                        onReload={onReload}
+                        setConfirmDeleteBT={setConfirmDeleteBT}
+                        handleImageUpload={handleImageUpload}
+                        deletingAnhId={deletingAnhId}
+                        uploadingBTId={uploadingBTId}
+                        setConfirmDeleteImg={setConfirmDeleteImg}
+                        cloneToDraft={cloneToDraft}
+                      />
                     ))}
                     {bienTheDaCo.length === 0 && (
                       <tr>
-                        <td
-                          colSpan={9}
-                          className="px-3 py-6 text-center text-gray-400"
-                        >
+                        <td colSpan={8} className="px-3 py-6 text-center text-gray-400">
                           Chưa có biến thể nào
                         </td>
                       </tr>
                     )}
                   </tbody>
                 </table>
+                <div className="p-2 bg-gray-50 text-[10px] text-gray-500 border-t border-gray-100 flex items-center justify-between">
+                   <span>OFF = biến thể không hiển thị trên cửa hàng</span>
+                   <span>Click trực tiếp vào giá, số lượng, kích thước, màu sắc để sửa</span>
+                </div>
+                </>
               )}
             </div>
           </div>
@@ -933,6 +1234,31 @@ function BienTheSanPhamModal({
           </button>
         </div>
       </div>
+
+      <ConfirmModal
+        open={!!confirmDeleteBT}
+        onClose={() => setConfirmDeleteBT(null)}
+        onConfirm={() => confirmDeleteBT && deleteVariant(confirmDeleteBT.id)}
+        title="Xóa biến thể?"
+        description={`Bạn có chắc muốn xóa biến thể ${(confirmDeleteBT?.kichThuoc?.kichCo || confirmDeleteBT?.kichThuoc?.tenKichThuoc) || ''} - ${(confirmDeleteBT?.mauSac?.tenMau || confirmDeleteBT?.mauSac?.tenMauSac) || ''}? Hành động này không thể hoàn tác.`}
+        confirmText="Xác nhận xóa"
+      />
+
+      <ConfirmModal
+        open={!!confirmDeleteImg}
+        onClose={() => setConfirmDeleteImg(null)}
+        onConfirm={() => confirmDeleteImg && deleteImage(confirmDeleteImg.id)}
+        title="Xóa ảnh?"
+        description="Bạn có chắc muốn xóa ảnh này khỏi biến thể?"
+        confirmText="Xác nhận xóa"
+      >
+        {confirmDeleteImg && (
+          <div className="flex justify-center mb-4">
+            <img src={getImageUrl(confirmDeleteImg.url)} alt="" className="w-16 h-16 rounded-lg object-cover border border-gray-200" onError={handleImgError} />
+          </div>
+        )}
+      </ConfirmModal>
+
     </div>
   );
 }
@@ -963,9 +1289,10 @@ function SanPhamForm({ inModal = false, editingSanPham, danhMuc, thuongHieu, cha
   useEffect(() => {
     if (!editingSanPham) return;
     setLoadingDetail(true);
-    sanPhamApi.chiTiet(editingSanPham.duongDan)
+    adminApi.chiTietAdmin(editingSanPham.id)
       .then(r => {
-        const sp = r.data.duLieu;
+        const payload = r.data.duLieu as any;
+        const sp = payload?.sanPham || payload;
         if (!sp) return;
         setForm({
           tenSanPham: sp.tenSanPham || '',
@@ -993,15 +1320,39 @@ function SanPhamForm({ inModal = false, editingSanPham, danhMuc, thuongHieu, cha
       toast.error('Vui lòng chọn danh mục');
       return;
     }
+
+    const giaGocNum = Number(form.giaGoc);
+    if (!Number.isFinite(giaGocNum) || giaGocNum <= 0) {
+      toast.error('Giá gốc phải lớn hơn 0');
+      return;
+    }
+    const danhMucIdNum = Number(form.danhMucId);
+    if (!Number.isFinite(danhMucIdNum) || danhMucIdNum <= 0) {
+      toast.error('Danh mục không hợp lệ');
+      return;
+    }
+
+    const thuongHieuIdNum = form.thuongHieuId ? Number(form.thuongHieuId) : null;
+    if (thuongHieuIdNum != null && (!Number.isFinite(thuongHieuIdNum) || thuongHieuIdNum <= 0)) {
+      toast.error('Thương hiệu không hợp lệ');
+      return;
+    }
+
+    const chatLieuIdNum = form.chatLieuId ? Number(form.chatLieuId) : null;
+    if (chatLieuIdNum != null && (!Number.isFinite(chatLieuIdNum) || chatLieuIdNum <= 0)) {
+      toast.error('Chất liệu không hợp lệ');
+      return;
+    }
+
     setSaving(true);
     try {
       const data: Record<string, unknown> = {
         tenSanPham: form.tenSanPham.trim(),
         moTaChiTiet: form.moTaChiTiet,
-        giaGoc: Number(form.giaGoc),
-        danhMucId: form.danhMucId ? Number(form.danhMucId) : null,
-        thuongHieuId: form.thuongHieuId ? Number(form.thuongHieuId) : null,
-        chatLieuId: form.chatLieuId ? Number(form.chatLieuId) : null,
+        giaGoc: giaGocNum,
+        danhMucId: danhMucIdNum,
+        thuongHieuId: thuongHieuIdNum,
+        chatLieuId: chatLieuIdNum,
         trangThai: form.trangThai,
       };
       if (savedProductId) {
@@ -1106,7 +1457,7 @@ function SanPhamForm({ inModal = false, editingSanPham, danhMuc, thuongHieu, cha
             <button type="button" onClick={onCancel} className="btn-secondary text-sm">
               {isEditMode ? 'Đóng' : 'Hủy'}
             </button>
-            {isEditMode && (
+            {!editingSanPham && isEditMode && (
               <button type="button" onClick={onSave} className="btn-secondary text-sm ml-auto">
                 ✓ Hoàn tất
               </button>

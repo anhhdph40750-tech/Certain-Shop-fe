@@ -27,8 +27,12 @@ import DangKyPage from './pages/DangKyPage';
 import DashboardPage from './pages/admin/DashboardPage';
 import QuanLyDonHangPage from './pages/admin/QuanLyDonHangPage';
 import QuanLyNguoiDungPage from './pages/admin/QuanLyNguoiDungPage';
+import QuanLyKhachHangPage from './pages/admin/QuanLyKhachHangPage';
+import ThemNhanVienPage from './pages/admin/ThemNhanVienPage';
 import QuanLySanPhamPage from './pages/admin/QuanLySanPhamPage';
 import QuanLyThuocTinhPage from './pages/admin/QuanLyThuocTinhPage';
+import QuanLyVoucherPage from './pages/admin/QuanLyVoucherPage';
+import BanHangTaiQuayPage from './pages/admin/BanHangTaiQuayPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -76,7 +80,13 @@ export default function App() {
             <Route path="san-pham" element={<QuanLySanPhamPage />} />
             <Route path="don-hang" element={<QuanLyDonHangPage />} />
             <Route path="nguoi-dung" element={<QuanLyNguoiDungPage />} />
+            <Route path="nguoi-dung/them-nhan-vien" element={<ThemNhanVienPage />} />
+            <Route path="nguoi-dung/them-khach-hang" element={<ThemNhanVienPage />} />
+            <Route path="nguoi-dung/sua/:id" element={<ThemNhanVienPage />} />
+            <Route path="khach-hang" element={<QuanLyKhachHangPage />} />
             <Route path="thuoc-tinh" element={<QuanLyThuocTinhPage />} />
+            <Route path="voucher" element={<QuanLyVoucherPage />} />
+            <Route path="ban-hang" element={<BanHangTaiQuayPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

@@ -4,7 +4,7 @@ import { formatCurrency, formatDate } from '../utils/format';
 import type { DonHang } from '../services/api';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
-
+import QRCode from "react-qr-code";
 interface InvoicePrintProps {
   donHang: DonHang;
   onClose?: () => void;
@@ -457,7 +457,8 @@ export default function InvoicePrint({ donHang, onClose }: InvoicePrintProps) {
             </div>
             <div className="text-right">
               <p className="text-4xl font-bold text-indigo-600">HÓA ĐƠN</p>
-              <p className="text-gray-700 text-base font-semibold mt-3">{donHang.maDonHang}</p>
+              <p className="text-gray-700 text-base font-semibold mt-3">{donHang.maDonHang}</p>  
+               <QRCode value={donHang.maDonHang} size={120} />
               <p className="text-gray-500 text-xs mt-1">{formatDate(donHang.thoiGianTao)}</p>
             </div>
           </div>
@@ -504,7 +505,11 @@ export default function InvoicePrint({ donHang, onClose }: InvoicePrintProps) {
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-gray-700">Phương thức</p>
                 <p className="text-base font-medium text-gray-800">
-                  {donHang.phuongThucThanhToan === 'COD' ? 'COD (Tiền mặt)' : 'VNPay'}
+                  {donHang.phuongThucThanhToan === 'COD' || donHang.phuongThucThanhToan === 'TIEN_MAT' 
+                    ? 'Tiền mặt' 
+                    : donHang.phuongThucThanhToan === 'CHUYEN_KHOAN' 
+                      ? 'Chuyển khoản' 
+                      : 'VNPay'}
                 </p>
               </div>
             </div>
