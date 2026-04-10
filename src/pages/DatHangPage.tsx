@@ -1,13 +1,13 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { gioHangApi, donHangApi, taiKhoanApi, ghnApi, voucherApi } from '../services/api';
+import { gioHangApi, donHangApi, taiKhoanApi, diaChiApi, ghnApi, voucherApi } from '../services/api';
 import type { GioHang, DiaChi } from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import { useCartStore } from '../stores/cartStore';
 import { formatCurrency, getImageUrl, handleImgError, PLACEHOLDER_IMG } from '../utils/format';
 import LoadingSpinner from '../components/LoadingSpinner';
 import toast from 'react-hot-toast';
-import { Tag, X } from 'lucide-react';
+import { Tag, X, Plus } from 'lucide-react';
 
 // Validation helpers
 const isValidPhoneNumber = (phone: string): boolean => {
@@ -16,6 +16,23 @@ const isValidPhoneNumber = (phone: string): boolean => {
 
 const isValidName = (name: string): boolean => {
   return name.trim().length >= 3 && name.trim().length <= 100;
+};
+
+type Province = { ProvinceID: number; ProvinceName: string };
+type District = { DistrictID: number; DistrictName: string };
+type Ward = { WardCode: string; WardName: string };
+
+type AddressFormState = {
+  hoTen: string;
+  soDienThoai: string;
+  tinhThanh: string;
+  maTinhGHN: number;
+  quanHuyen: string;
+  maHuyenGHN: number;
+  phuongXa: string;
+  maXaGHN: string;
+  diaChiDong1: string;
+  laMacDinh: boolean;
 };
 
 export default function DatHangPage() {
@@ -31,6 +48,23 @@ export default function DatHangPage() {
   const [tenNguoiNhan, setTenNguoiNhan] = useState('');
   const [sdtNguoiNhan, setSdtNguoiNhan] = useState('');
   const [diaChiGiaoHang, setDiaChiGiaoHang] = useState('');
+  const [showAddAddressModal, setShowAddAddressModal] = useState(false);
+  const [provinceList, setProvinceList] = useState<Province[]>([]);
+  const [districtList, setDistrictList] = useState<District[]>([]);
+  const [wardList, setWardList] = useState<Ward[]>([]);
+  const [addressForm, setAddressForm] = useState<AddressFormState>({
+    hoTen: '',
+    soDienThoai: '',
+    tinhThanh: '',
+    maTinhGHN: 0,
+    quanHuyen: '',
+    maHuyenGHN: 0,
+    phuongXa: '',
+    maXaGHN: '',
+    diaChiDong1: '',
+    laMacDinh: false,
+  });
+  const [savingAddress, setSavingAddress] = useState(false);
   
   // GHN shipping
   const [phiVanChuyen, setPhiVanChuyen] = useState<number>(0);
@@ -41,16 +75,18 @@ export default function DatHangPage() {
   const [voucherListModal, setVoucherListModal] = useState<any[]>([]);
   const [loadingVoucherList, setLoadingVoucherList] = useState(false);
 
+  // Confirmation modal
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
   const { isLoggedIn } = useAuthStore();
   const { setCount } = useCartStore();
   const navigate = useNavigate();
-  const shippingCalledRef = useRef<number | undefined>(undefined);  // Track address ID to avoid duplicate calls
+  const shippingCalledRef = useRef<number | undefined>(undefined);
 
-  // Shipping calculation - stable reference when gioHang/address unchanged
+  // Shipping calculation
   const tinhPhiVanChuyen = useCallback(async (maHuyen: number, maXa: string) => {
     setLoadingShip(true);
     try {
-      // Use current gioHang from state (closure)
       const tongKg = gioHang?.danhSachChiTiet?.length || 1;
       const trongLuongGram = tongKg * 300;
       const res = await ghnApi.tinhPhi(maHuyen, maXa, trongLuongGram);
@@ -62,7 +98,7 @@ export default function DatHangPage() {
     } finally {
       setLoadingShip(false);
     }
-  }, [gioHang]);  // Include gioHang - safe because shipping effect handles it
+  }, [gioHang]);
 
   useEffect(() => {
     if (!isLoggedIn()) { navigate('/dang-nhap'); return; }
@@ -81,7 +117,6 @@ export default function DatHangPage() {
       const dcs = diaChiRes.data.duLieu || [];
       setDiaChiList(dcs);
       
-      // Set default address - don't call shipping here
       const macDinh = dcs.find(dc => dc.laMacDinh) || dcs[0] || null;
       setSelectedDiaChi(macDinh);
       
@@ -97,21 +132,18 @@ export default function DatHangPage() {
     }).finally(() => setLoading(false));
   }, [isLoggedIn, navigate]);
 
-  // SEPARATE effect for shipping - only when selectedDiaChi changes
   useEffect(() => {
     if (!selectedDiaChi?.maHuyenGHN || !selectedDiaChi.maXaGHN) {
       setPhiVanChuyen(0);
       return;
     }
     
-    // Only calculate once per address change
     if (!shippingCalledRef.current || selectedDiaChi.id !== shippingCalledRef.current) {
       shippingCalledRef.current = selectedDiaChi.id;
       tinhPhiVanChuyen(selectedDiaChi.maHuyenGHN, selectedDiaChi.maXaGHN);
     }
   }, [selectedDiaChi?.id, selectedDiaChi?.maHuyenGHN, selectedDiaChi?.maXaGHN, tinhPhiVanChuyen]);
 
-  // Reset voucher when cart changes (avoid stale discount)
   useEffect(() => {
     setVoucherInfo(null);
     setMaVoucher('');
@@ -122,7 +154,104 @@ export default function DatHangPage() {
     setTenNguoiNhan(dc.hoTen || '');
     setSdtNguoiNhan(dc.soDienThoai || '');
     setDiaChiGiaoHang(`${dc.diaChiDong1}, ${dc.phuongXa}, ${dc.quanHuyen}, ${dc.tinhThanh}`);
-    // Shipping calculation will be triggered by useEffect watching selectedDiaChi
+  };
+
+  const loadAddressList = async () => {
+    const diaChiRes = await taiKhoanApi.danhSachDiaChi();
+    const list = diaChiRes.data.duLieu || [];
+    setDiaChiList(list);
+    return list;
+  };
+
+  useEffect(() => {
+    diaChiApi.layDanhSachTinh()
+      .then(r => setProvinceList(r.data.duLieu || []))
+      .catch(err => console.error('Lỗi tải tỉnh:', err));
+  }, []);
+
+  useEffect(() => {
+    if (!addressForm.maTinhGHN) {
+      setDistrictList([]);
+      setWardList([]);
+      return;
+    }
+    diaChiApi.layDanhSachHuyen(addressForm.maTinhGHN)
+      .then(r => {
+        setDistrictList(r.data.duLieu || []);
+        setWardList([]);
+      })
+      .catch(err => console.error('Lỗi tải huyện:', err));
+  }, [addressForm.maTinhGHN]);
+
+  useEffect(() => {
+    if (!addressForm.maHuyenGHN) {
+      setWardList([]);
+      return;
+    }
+    diaChiApi.layDanhSachXa(addressForm.maHuyenGHN)
+      .then(r => setWardList(r.data.duLieu || []))
+      .catch(err => console.error('Lỗi tải xã:', err));
+  }, [addressForm.maHuyenGHN]);
+
+  const openAddAddressModal = () => {
+    setAddressForm({
+      hoTen: selectedDiaChi?.hoTen || '',
+      soDienThoai: selectedDiaChi?.soDienThoai || '',
+      tinhThanh: selectedDiaChi?.tinhThanh || '',
+      maTinhGHN: selectedDiaChi?.maTinhGHN || 0,
+      quanHuyen: selectedDiaChi?.quanHuyen || '',
+      maHuyenGHN: selectedDiaChi?.maHuyenGHN || 0,
+      phuongXa: selectedDiaChi?.phuongXa || '',
+      maXaGHN: selectedDiaChi?.maXaGHN || '',
+      diaChiDong1: selectedDiaChi?.diaChiDong1 || '',
+      laMacDinh: false,
+    });
+    setShowAddAddressModal(true);
+  };
+
+  const saveNewAddress = async (e: FormEvent) => {
+    e.preventDefault();
+    if (addressForm.hoTen.trim().length < 3) {
+      toast.error('Tên người nhận phải có ít nhất 3 ký tự');
+      return;
+    }
+    if (!isValidPhoneNumber(addressForm.soDienThoai)) {
+      toast.error('Số điện thoại không hợp lệ (10-11 chữ số)');
+      return;
+    }
+    if (!addressForm.maTinhGHN || !addressForm.maHuyenGHN || !addressForm.maXaGHN) {
+      toast.error('Vui lòng chọn đầy đủ Tỉnh/Thành, Quận/Huyện, Phường/Xã');
+      return;
+    }
+    if (addressForm.diaChiDong1.trim().length < 5) {
+      toast.error('Địa chỉ cụ thể phải có ít nhất 5 ký tự');
+      return;
+    }
+
+    setSavingAddress(true);
+    try {
+      const payload = {
+        ...addressForm,
+        hoTen: addressForm.hoTen.trim(),
+        soDienThoai: addressForm.soDienThoai.replace(/\s/g, ''),
+        diaChiDong1: addressForm.diaChiDong1.trim(),
+      };
+      const res = await taiKhoanApi.themDiaChi(payload);
+      const newAddress = res.data.duLieu;
+      const list = await loadAddressList();
+      const selected = list.find(a => a.id === newAddress.id) || newAddress;
+      setSelectedDiaChi(selected);
+      setTenNguoiNhan(selected.hoTen || '');
+      setSdtNguoiNhan(selected.soDienThoai || '');
+      setDiaChiGiaoHang(`${selected.diaChiDong1}, ${selected.phuongXa}, ${selected.quanHuyen}, ${selected.tinhThanh}`);
+      toast.success('Đã thêm địa chỉ mới');
+      setShowAddAddressModal(false);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { thongBao?: string } } })?.response?.data?.thongBao || 'Lỗi thêm địa chỉ';
+      toast.error(msg);
+    } finally {
+      setSavingAddress(false);
+    }
   };
 
   const handleKiemTraVoucher = async () => {
@@ -187,34 +316,42 @@ export default function DatHangPage() {
     return s + donGia * ct.soLuong;
   }, 0) || 0;
 
-  const handleDatHang = async () => {
-    // Validate cart is not empty
+  // Validation logic extracted
+  const validateOrder = () => {
     if (!gioHang?.danhSachChiTiet?.length) {
       toast.error('Giỏ hàng trống');
       navigate('/gio-hang');
-      return;
+      return false;
     }
-
-    // Validate customer info
     if (!isValidName(tenNguoiNhan)) {
       toast.error('Tên người nhận phải từ 3-100 ký tự');
-      return;
+      return false;
     }
     if (!isValidPhoneNumber(sdtNguoiNhan)) {
       toast.error('Số điện thoại không hợp lệ (10-11 chữ số)');
-      return;
+      return false;
     }
     if (!diaChiGiaoHang || diaChiGiaoHang.trim().length < 10) {
       toast.error('Địa chỉ giao hàng phải từ 10 ký tự trở lên');
-      return;
+      return false;
     }
-
-    // Validate total amount is not negative (0 is OK when voucher covers whole order)
     if (tongThanhToan < 0) {
       toast.error('Tổng thanh toán không hợp lệ. Vui lòng kiểm tra giỏ hàng và mã khuyến mãi');
-      return;
+      return false;
     }
+    return true;
+  };
 
+  // Show confirmation modal after validation passes
+  const handleDatHang = () => {
+    if (validateOrder()) {
+      setShowConfirmModal(true);
+    }
+  };
+
+  // Actual order submission after confirmation
+  const handleConfirmOrder = async () => {
+    setShowConfirmModal(false);
     setSubmitting(true);
     try {
       const payload: Record<string, unknown> = {
@@ -224,7 +361,7 @@ export default function DatHangPage() {
         phuongThucThanhToan: phuongThuc,
         ghiChu: ghiChu.trim() || null,
         maVoucher: voucherInfo?.maVoucher || null,
-        phiVanChuyen: Math.max(0, phiVanChuyen), // Ensure no negative shipping
+        phiVanChuyen: Math.max(0, phiVanChuyen),
       };
       if (selectedDiaChi?.id) {
         payload.diaChiId = selectedDiaChi.id;
@@ -238,7 +375,6 @@ export default function DatHangPage() {
       const res = await donHangApi.datHang(payload);
       const duLieu = res.data.duLieu as unknown as { maDonHang: string; urlThanhToan?: string };
       setCount(0);
-      // VNPay: redirect to payment page
       if (phuongThuc === 'VNPAY' && duLieu?.urlThanhToan) {
         toast.success('Đang chuyển đến trang thanh toán VNPay...');
         window.location.href = duLieu.urlThanhToan;
@@ -254,7 +390,6 @@ export default function DatHangPage() {
     }
   };
 
-  // calculate totals using fallback for cases where backend returns 0
   const tongHang = tongHangForVoucher;
   const soTienGiam = voucherInfo?.giaTriGiam || 0;
   const tongThanhToan = Math.max(0, tongHang - soTienGiam + phiVanChuyen);
@@ -272,10 +407,15 @@ export default function DatHangPage() {
           <div className="bg-white rounded-xl border border-gray-100 p-6">
             <h2 className="font-bold text-gray-900 mb-4">Thông tin giao hàng</h2>
 
-            {/* Select saved address */}
-            {diaChiList.length > 0 && (
-              <div className="mb-4">
-                <label className="text-sm font-medium text-gray-700 mb-2 block">Chọn địa chỉ đã lưu</label>
+            <div className="mb-4">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <label className="text-sm font-medium text-gray-700">Chọn địa chỉ đã lưu</label>
+                <button type="button" onClick={openAddAddressModal}
+                  className="btn-primary inline-flex items-center gap-2 px-3 py-2 text-sm font-medium">
+                  <Plus className="w-4 h-4" /> Thêm địa chỉ
+                </button>
+              </div>
+              {diaChiList.length > 0 ? (
                 <div className="space-y-2">
                   {diaChiList.map(dc => (
                     <label key={dc.id}
@@ -291,12 +431,14 @@ export default function DatHangPage() {
                     </label>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-500">
+                  Chưa có địa chỉ lưu nào. Nhấn “Thêm địa chỉ” để thêm địa chỉ giao hàng mới.
+                </div>
+              )}
+            </div>
 
             <div className="space-y-3">
-              
-            
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-1 block">Ghi chú đơn hàng</label>
                 <textarea value={ghiChu} onChange={e => setGhiChu(e.target.value)}
@@ -312,7 +454,6 @@ export default function DatHangPage() {
               {[
                 { value: 'COD', label: '💵 Thanh toán khi nhận hàng (COD)' },
                 { value: 'VNPAY', label: '💳 Thanh toán qua VNPay' },
-              
               ].map(pt => (
                 <label key={pt.value}
                   className={`flex gap-3 p-4 rounded-lg border cursor-pointer transition-all ${phuongThuc === pt.value ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}>
@@ -348,6 +489,140 @@ export default function DatHangPage() {
             )}
           </div>
         </div>
+
+        {showAddAddressModal && (
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between p-5 border-b">
+                <h2 className="text-lg font-bold text-gray-900">Thêm địa chỉ giao hàng</h2>
+                <button onClick={() => setShowAddAddressModal(false)} className="p-1 hover:bg-gray-100 rounded-lg">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <form onSubmit={saveNewAddress} className="p-5 overflow-y-auto flex-1 space-y-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Họ tên *</label>
+                    <input
+                      value={addressForm.hoTen}
+                      onChange={e => setAddressForm(prev => ({ ...prev, hoTen: e.target.value }))}
+                      className="input-field w-full"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Số điện thoại *</label>
+                    <input
+                      value={addressForm.soDienThoai}
+                      onChange={e => setAddressForm(prev => ({ ...prev, soDienThoai: e.target.value }))}
+                      className="input-field w-full"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tỉnh/Thành phố *</label>
+                    <select
+                      className="input-field w-full"
+                      value={addressForm.maTinhGHN}
+                      onChange={e => {
+                        const value = Number(e.target.value);
+                        const item = provinceList.find(p => p.ProvinceID === value);
+                        setAddressForm(prev => ({
+                          ...prev,
+                          maTinhGHN: value,
+                          tinhThanh: item?.ProvinceName || '',
+                          maHuyenGHN: 0,
+                          quanHuyen: '',
+                          phuongXa: '',
+                          maXaGHN: '',
+                        }));
+                      }}
+                      required
+                    >
+                      <option value={0}>-- Chọn Tỉnh/Thành phố --</option>
+                      {provinceList.map(province => (
+                        <option key={province.ProvinceID} value={province.ProvinceID}>{province.ProvinceName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Quận/Huyện *</label>
+                    <select
+                      className="input-field w-full"
+                      value={addressForm.maHuyenGHN}
+                      onChange={e => {
+                        const value = Number(e.target.value);
+                        const item = districtList.find(d => d.DistrictID === value);
+                        setAddressForm(prev => ({
+                          ...prev,
+                          maHuyenGHN: value,
+                          quanHuyen: item?.DistrictName || '',
+                          phuongXa: '',
+                          maXaGHN: '',
+                        }));
+                      }}
+                      required
+                      disabled={!addressForm.maTinhGHN}
+                    >
+                      <option value={0}>-- Chọn Quận/Huyện --</option>
+                      {districtList.map(district => (
+                        <option key={district.DistrictID} value={district.DistrictID}>{district.DistrictName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Phường/Xã *</label>
+                    <select
+                      className="input-field w-full"
+                      value={addressForm.maXaGHN}
+                      onChange={e => {
+                        const value = e.target.value;
+                        const item = wardList.find(w => w.WardCode === value);
+                        setAddressForm(prev => ({
+                          ...prev,
+                          maXaGHN: value,
+                          phuongXa: item?.WardName || '',
+                        }));
+                      }}
+                      required
+                      disabled={!addressForm.maHuyenGHN}
+                    >
+                      <option value="">-- Chọn Phường/Xã --</option>
+                      {wardList.map(ward => (
+                        <option key={ward.WardCode} value={ward.WardCode}>{ward.WardName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Địa chỉ cụ thể *</label>
+                    <input
+                      value={addressForm.diaChiDong1}
+                      onChange={e => setAddressForm(prev => ({ ...prev, diaChiDong1: e.target.value }))}
+                      className="input-field w-full"
+                      required
+                    />
+                  </div>
+                  <div className="sm:col-span-2 flex items-center gap-2">
+                    <input
+                      id="laMacDinh"
+                      type="checkbox"
+                      checked={addressForm.laMacDinh}
+                      onChange={e => setAddressForm(prev => ({ ...prev, laMacDinh: e.target.checked }))}
+                      className="mt-1"
+                    />
+                    <label htmlFor="laMacDinh" className="text-sm text-gray-600">Đặt làm địa chỉ mặc định</label>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 border-t pt-4">
+                  <button type="button" onClick={() => setShowAddAddressModal(false)} className="btn-secondary">Hủy</button>
+                  <button type="submit" disabled={savingAddress} className="btn-primary">
+                    {savingAddress ? 'Đang lưu...' : 'Lưu địa chỉ'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Right - Summary */}
         <div>
@@ -398,7 +673,7 @@ export default function DatHangPage() {
 
             <button onClick={handleDatHang} disabled={submitting}
               className="btn-primary w-full py-3 mt-6 font-semibold">
-              {submitting ? 'Đang xử lý...' : 'Đặt hàng'}
+              Đặt hàng
             </button>
           </div>
         </div>
@@ -414,7 +689,6 @@ export default function DatHangPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            {/* Manual input */}
             <div className="px-5 pt-4 flex gap-2">
               <input
                 value={maVoucher}
@@ -424,7 +698,6 @@ export default function DatHangPage() {
               />
               <button onClick={handleKiemTraVoucher} className="btn-primary px-4 text-sm">Áp dụng</button>
             </div>
-            {/* Voucher list */}
             <div className="p-5 overflow-y-auto flex-1 space-y-2">
               {loadingVoucherList ? (
                 <p className="text-center text-gray-400 py-8">Đang tải...</p>
@@ -459,6 +732,100 @@ export default function DatHangPage() {
                   </div>
                 ))
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-5 border-b">
+              <h2 className="text-lg font-bold text-gray-900">Xác nhận đơn hàng</h2>
+              <button onClick={() => setShowConfirmModal(false)} className="p-1 hover:bg-gray-100 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto flex-1 space-y-4">
+              {/* Recipient info */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="font-semibold text-gray-900 mb-2">Thông tin nhận hàng</h3>
+                <p className="text-sm"><span className="font-medium">Người nhận:</span> {tenNguoiNhan}</p>
+                <p className="text-sm"><span className="font-medium">SĐT:</span> {sdtNguoiNhan}</p>
+                <p className="text-sm"><span className="font-medium">Địa chỉ:</span> {diaChiGiaoHang}</p>
+                {ghiChu && <p className="text-sm"><span className="font-medium">Ghi chú:</span> {ghiChu}</p>}
+              </div>
+
+              {/* Order items */}
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-2">Sản phẩm</h3>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {gioHang?.danhSachChiTiet?.map(ct => {
+                    const donGia = ct.donGia || ct.bienThe?.gia || 0;
+                    const thanhTien = donGia * ct.soLuong;
+                    return (
+                      <div key={ct.id} className="flex gap-3 border-b pb-2">
+                        <img
+                          src={ct.bienThe?.anhChinh ? getImageUrl(ct.bienThe.anhChinh) : PLACEHOLDER_IMG}
+                          alt="" className="w-12 h-12 object-cover rounded bg-gray-100"
+                          onError={handleImgError}
+                        />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{ct.bienThe?.tenSanPham}</p>
+                          <p className="text-xs text-gray-500">Số lượng: {ct.soLuong}</p>
+                          <p className="text-sm font-semibold text-indigo-600">{formatCurrency(thanhTien)}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Payment & totals */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="font-semibold text-gray-900 mb-2">Thanh toán</h3>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span>Tạm tính:</span>
+                    <span>{formatCurrency(tongHang)}</span>
+                  </div>
+                  {soTienGiam > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Giảm giá:</span>
+                      <span>-{formatCurrency(soTienGiam)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span>Phí vận chuyển:</span>
+                    <span>{formatCurrency(phiVanChuyen)}</span>
+                  </div>
+                  <div className="border-t pt-2 flex justify-between font-bold text-base">
+                    <span>Tổng cộng:</span>
+                    <span className="text-indigo-600">{formatCurrency(tongThanhToan)}</span>
+                  </div>
+                  <div className="mt-2 pt-2 border-t">
+                    <p className="font-medium">Phương thức thanh toán:</p>
+                    <p className="text-sm">{phuongThuc === 'COD' ? 'Thanh toán khi nhận hàng (COD)' : 'Thanh toán qua VNPay'}</p>
+                  </div>
+                  {voucherInfo && (
+                    <div className="mt-2">
+                      <p className="font-medium">Voucher áp dụng:</p>
+                      <p className="text-sm text-green-600">{voucherInfo.maVoucher} - Giảm {formatCurrency(voucherInfo.giaTriGiam)}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 border-t flex justify-end gap-3">
+              <button onClick={() => setShowConfirmModal(false)} className="px-4 py-2 border rounded-lg hover:bg-gray-50">
+                Quay lại
+              </button>
+              <button onClick={handleConfirmOrder} disabled={submitting} className="btn-primary px-6 py-2">
+                {submitting ? 'Đang xử lý...' : 'Xác nhận đặt hàng'}
+              </button>
             </div>
           </div>
         </div>

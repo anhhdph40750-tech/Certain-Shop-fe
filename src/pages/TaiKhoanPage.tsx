@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User, MapPin, Lock, Plus, Edit2, Trash2, Check } from 'lucide-react';
+import { User, MapPin, Plus, Edit2, Trash2, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { taiKhoanApi, diaChiApi } from '../services/api';
 import type { DiaChi, User as UserType } from '../services/api';

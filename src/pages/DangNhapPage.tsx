@@ -26,7 +26,7 @@ export default function DangNhapPage() {
       setAuth(token, nguoiDung);
       toast.success(`Xin chào, ${nguoiDung.hoTen || nguoiDung.tenDangNhap}!`);
       // Redirect based on role
-      if (nguoiDung.vaiTro === 'ADMIN' || nguoiDung.vaiTro === 'NHAN_VIEN') {
+      if (nguoiDung.vaiTro === 'ADMIN' || nguoiDung.vaiTro === 'NHAN_VIEN' || nguoiDung.vaiTro === 'SUPER_ADMIN') {
         navigate('/quan-ly');
       } else {
         navigate('/');

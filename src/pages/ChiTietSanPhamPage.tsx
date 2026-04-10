@@ -17,7 +17,7 @@ export default function ChiTietSanPhamPage() {
   const [loading, setLoading] = useState(true);
   const [showInfo, setShowInfo] = useState(false);
   const { isLoggedIn, isNhanVien, isAdmin } = useAuthStore();
-  const { increment } = useCartStore();
+  const { setCount } = useCartStore();
   const navigate = useNavigate();
 
   // Check if user is staff/admin (not customer)
@@ -89,7 +89,10 @@ export default function ChiTietSanPhamPage() {
     }
     try {
       await gioHangApi.them(selectedBienThe.id, soLuong);
-      for (let i = 0; i < soLuong; i++) increment();
+      // Update cart count
+      const cartRes = await gioHangApi.lay();
+      const totalQuantity = cartRes.data.duLieu?.danhSachChiTiet?.reduce((sum, ct) => sum + ct.soLuong, 0) || 0;
+      setCount(totalQuantity);
       toast.success('Đã thêm vào giỏ hàng!');
     } catch {
       toast.error('Có lỗi xảy ra');

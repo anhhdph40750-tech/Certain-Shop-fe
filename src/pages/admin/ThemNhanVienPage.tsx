@@ -3,6 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, Upload, X, User } from 'lucide-react';
 import { adminApi, diaChiApi } from '../../services/api';
 import toast from 'react-hot-toast';
+import { useAuthStore } from '../../stores/authStore';
 
 // Routes that use this component:
 //   /quan-ly/nguoi-dung/them-nhan-vien  → add NV (vaiTroId=2)
@@ -43,6 +44,7 @@ export default function ThemNhanVienPage() {
   const { id } = useParams<{ id?: string }>();
   const location = useLocation();
   const fileRef = useRef<HTMLInputElement>(null);
+  const { isSuperAdmin } = useAuthStore();
 
   const pageMode: PageMode = id
     ? 'sua'
@@ -50,12 +52,11 @@ export default function ThemNhanVienPage() {
 
   const isEdit = pageMode === 'sua';
 
-  const [editVaiTro, setEditVaiTro] = useState<'NHAN_VIEN' | 'KHACH_HANG'>('NHAN_VIEN');
+  const [editVaiTro, setEditVaiTro] = useState<'SUPER_ADMIN' | 'ADMIN' | 'NHAN_VIEN' | 'KHACH_HANG'>('NHAN_VIEN');
   const isKhachHang = pageMode === 'them-kh' || (isEdit && editVaiTro === 'KHACH_HANG');
-  const tenLoai = isKhachHang ? 'Khach hang' : 'Nhan vien';
   const tenLoaiVN = isKhachHang ? 'Khách hàng' : 'Nhân viên';
   const backUrl = isKhachHang ? '/quan-ly/khach-hang' : '/quan-ly/nguoi-dung';
-  const vaiTroId = isKhachHang ? 3 : 2;
+  const vaiTroId = editVaiTro === 'KHACH_HANG' ? 3 : editVaiTro === 'NHAN_VIEN' ? 2 : editVaiTro === 'ADMIN' ? 4 : 1;
 
   const [form, setForm] = useState<FormState>(blankForm);
   const [anhPreview, setAnhPreview] = useState<string | null>(null);
@@ -80,8 +81,8 @@ export default function ThemNhanVienPage() {
       .then(async r => {
         const u = r.data.duLieu;
         if (!u) return;
-        const vaiTro = u.vaiTro?.tenVaiTro === 'KHACH_HANG' ? 'KHACH_HANG' : 'NHAN_VIEN';
-        setEditVaiTro(vaiTro);
+        const vaiTro = u.vaiTro?.tenVaiTro;
+        setEditVaiTro(vaiTro as 'SUPER_ADMIN' | 'ADMIN' | 'NHAN_VIEN' | 'KHACH_HANG');
         const diaChi = u.danhSachDiaChi?.find((d: any) => d.laMacDinh) ?? u.danhSachDiaChi?.[0];
         const maTinh = diaChi?.maTinhGHN || null;
         const maHuyen = diaChi?.maHuyenGHN || null;
@@ -152,6 +153,9 @@ export default function ThemNhanVienPage() {
   const handleSubmit = async () => {
     if (!form.hoTen.trim()) { toast.error(`Vui lòng nhập tên ${tenLoaiVN.toLowerCase()}`); return; }
     if (!form.email.trim()) { toast.error('Vui lòng nhập email'); return; }
+    if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) { toast.error('Email không đúng định dạng'); return; }
+    if (form.soDienThoai.trim() && !/^\d{10,11}$/.test(form.soDienThoai.trim())) { toast.error('Số điện thoại phải là 10-11 chữ số'); return; }
+    if (form.cccd.trim() && !/^\d{12,15}$/.test(form.cccd.trim())) { toast.error('CCCD phải là 12-15 chữ số'); return; }
     if (!isEdit) {
       if (!form.tenDangNhap.trim()) { toast.error('Vui lòng nhập tên đăng nhập'); return; }
       if (!form.matKhau || form.matKhau.length < 6) { toast.error('Mật khẩu tối thiểu 6 ký tự'); return; }
@@ -173,6 +177,7 @@ export default function ThemNhanVienPage() {
         phuongXa: form.phuongXa || undefined, diaChiCuThe: form.diaChiCuThe.trim() || undefined,
         maTinhGHN: form.maTinhGHN ?? undefined, maHuyenGHN: form.maHuyenGHN ?? undefined,
         maXaGHN: form.maXaGHN || undefined,
+        ...(isSuperAdmin() ? { vaiTroId } : {}),
       };
       if (isEdit && id) {
         await adminApi.capNhatNguoiDung(Number(id), base);
@@ -246,6 +251,25 @@ export default function ThemNhanVienPage() {
             <input className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
               placeholder="Nguyễn Văn A" value={form.hoTen} onChange={setF('hoTen')} />
           </div>
+
+          {/* Vai trò - chỉ SUPER_ADMIN mới có thể set */}
+          {isSuperAdmin() && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Vai trò <span className="text-red-500">*</span>
+              </label>
+              <select
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                value={editVaiTro}
+                onChange={(e) => setEditVaiTro(e.target.value as 'SUPER_ADMIN' | 'ADMIN' | 'NHAN_VIEN' | 'KHACH_HANG')}
+              >
+                <option value="KHACH_HANG">Khách hàng</option>
+                <option value="NHAN_VIEN">Nhân viên</option>
+                <option value="ADMIN">Admin</option>
+                <option value="SUPER_ADMIN">Super Admin</option>
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Số điện thoại</label>

@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { voucherApi } from '../../services/api';
 import type { Voucher } from '../../services/api';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import { useAuthStore } from '../../stores/authStore';
 
 type LoaiGiam = 'PERCENT' | 'FIXED';
 
@@ -35,6 +36,7 @@ const EMPTY_FORM: VoucherFormState = {
 };
 
 export default function QuanLyVoucherPage() {
+  const { isAdmin, isSuperAdmin } = useAuthStore();
   const [list, setList] = useState<Voucher[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -257,16 +259,18 @@ export default function QuanLyVoucherPage() {
             Tạo và quản lý mã giảm giá áp dụng cho đơn hàng.
           </p>
         </div>
-        <button
-          onClick={openAdd}
-          className="btn-primary flex items-center gap-2 text-sm"
-        >
-          <Plus className="w-4 h-4" />
-          Thêm voucher
-        </button>
+        {(isAdmin() || isSuperAdmin()) && (
+          <button
+            onClick={openAdd}
+            className="btn-primary flex items-center gap-2 text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Thêm voucher
+          </button>
+        )}
       </div>
 
-      {showForm && (
+      {(isAdmin() || isSuperAdmin()) && showForm && (
         <div className="bg-white rounded-xl border border-gray-100 p-5 mb-5">
           <h3 className="font-semibold text-gray-900 mb-4">
             {editing ? 'Sửa voucher' : 'Thêm voucher mới'}
@@ -513,7 +517,7 @@ export default function QuanLyVoucherPage() {
                 <td className="px-4 py-4">
                   <div className="flex flex-col items-start gap-2">
                     {StatusBadge}
-                    {canToggle && (
+                    {canToggle && (isAdmin() || isSuperAdmin()) && (
                       <button
                         onClick={() => toggleTrangThai(v)}
                         className={`text-xs px-2.5 py-1 rounded border transition-colors ${
@@ -528,22 +532,24 @@ export default function QuanLyVoucherPage() {
                   </div>
                 </td>
                 <td className="px-4 py-4">
-                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => openEdit(v)}
-                      title="Chỉnh sửa"
-                      className="p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => xoa(v.id)}
-                      title="Xóa voucher"
-                      className="p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  {(isAdmin() || isSuperAdmin()) && (
+                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => openEdit(v)}
+                        title="Chỉnh sửa"
+                        className="p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => xoa(v.id)}
+                        title="Xóa voucher"
+                        className="p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </td>
               </tr>
             );

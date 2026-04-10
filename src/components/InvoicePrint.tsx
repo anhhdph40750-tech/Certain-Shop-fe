@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Printer, Download } from 'lucide-react';
+// import { Printer, Download } from 'lucide-react';
 import { formatCurrency, formatDate } from '../utils/format';
 import type { DonHang } from '../services/api';
 import { jsPDF } from 'jspdf';
@@ -10,10 +10,10 @@ interface InvoicePrintProps {
   onClose?: () => void;
 }
 
-export default function InvoicePrint({ donHang, onClose }: InvoicePrintProps) {
+export default function InvoicePrint({ donHang, onClose: _onClose }: InvoicePrintProps) {
   const printRef = useRef<HTMLDivElement>(null);
 
-  const handlePrint = () => {
+  const _handlePrint = () => {
     if (!printRef.current) return;
     const printWindow = window.open('', '', 'height=900,width=1000');
     if (!printWindow) {
@@ -31,7 +31,7 @@ export default function InvoicePrint({ donHang, onClose }: InvoicePrintProps) {
 
   // ENTERPRISE-GRADE SOLUTION: Remove classes FIRST, then inject clean CSS
   // This prevents html2canvas from encountering unsupported okch() color functions
-  const handleDownloadPDF = async () => {
+  const _handleDownloadPDF = async () => {
     const element = printRef.current;
     if (!element) return;
 
@@ -420,13 +420,13 @@ export default function InvoicePrint({ donHang, onClose }: InvoicePrintProps) {
     <div className="space-y-6">
       {/* Action buttons */}
       <div className="flex gap-4">
-        <button
+        {/* <button
           onClick={handlePrint}
           className="flex items-center gap-2 btn-primary px-6 py-3 text-lg font-semibold"
         >
           <Printer className="w-5 h-5" /> In hóa đơn
-        </button>
-        <button
+        </button> */}
+        {/* <button
           onClick={handleDownloadPDF}
           className="flex items-center gap-2 btn-secondary px-6 py-3 text-lg font-semibold"
         >
@@ -436,13 +436,13 @@ export default function InvoicePrint({ donHang, onClose }: InvoicePrintProps) {
           <button onClick={onClose} className="btn-outline px-6 py-3 text-lg font-semibold">
             Đóng
           </button>
-        )}
+        )} */}
       </div>
 
       {/* Invoice template for printing */}
       <div
         ref={printRef}
-        className="bg-white print:p-0 rounded-lg"
+        className="bg-white print:p-0 rounded-lg invoice-print-area"
         style={{ pageBreakAfter: 'avoid', fontSize: '16px', padding: '0' }}
       >
         {/* Header with gradient background */}

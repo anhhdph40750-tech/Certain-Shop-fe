@@ -30,7 +30,8 @@ export default function Header() {
     }
     gioHangApi.lay().then(r => {
       const items = r.data.duLieu?.danhSachChiTiet;
-      setCount(items ? items.length : 0);
+      const totalQuantity = items ? items.reduce((sum, ct) => sum + ct.soLuong, 0) : 0;
+      setCount(totalQuantity);
     }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);

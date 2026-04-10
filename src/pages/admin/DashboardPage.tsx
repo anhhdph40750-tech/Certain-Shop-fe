@@ -101,7 +101,6 @@ export default function DashboardPage() {
   if (loading) return <LoadingSpinner fullPage />;
 
   const choXacNhan = data?.thongKeTrangThai?.CHO_XAC_NHAN ?? 0;
-  const tongDonHang = Object.values(data?.thongKeTrangThai || {}).reduce((a, b) => a + b, 0);
 
   const cards = [
     { label: 'Doanh thu hôm nay', value: formatCurrency(data?.doanhThuHomNay ?? 0)},
@@ -171,7 +170,7 @@ export default function DashboardPage() {
         <YAxis />
 
         <Tooltip
-          formatter={(value: number) => formatCurrency(value)}
+          formatter={(value: any) => typeof value === 'number' ? formatCurrency(value) : value}
         />
 
         <Line

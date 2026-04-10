@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Search, Plus, Edit2, Eye, Upload, X, Layers, AlertTriangle, Trash2, Download, UploadCloud, MoreVertical, Pencil } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
+import { Search, Plus, Edit2, Eye, Upload, X, Layers, AlertTriangle, Trash2, Download, UploadCloud } from 'lucide-react';
 import { adminApi, sanPhamApi, thuocTinhApi } from '../../services/api';
 import type { SanPhamItem, BienThe as BienTheType, DanhMuc, ThuongHieu, MauSac, KichThuoc, ChatLieu } from '../../services/api';
 import { formatCurrency, getImageUrl, trangThaiSanPhamLabel, handleImgError } from '../../utils/format';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import { useAuthStore } from '../../stores/authStore';
 
 /* ==================== CONFIRM MODAL CHUNG ==================== */
 interface ConfirmModalProps {
@@ -23,8 +24,8 @@ interface ConfirmModalProps {
 function ConfirmModal({ open, onClose, onConfirm, title, description, confirmText = 'Xác nhận', cancelText = 'Hủy', variant = 'danger', loading, children }: ConfirmModalProps) {
   if (!open) return null;
   const colors = {
-    danger:  { bg: 'bg-red-50',     icon: 'bg-red-100 text-red-600',     btn: 'bg-red-500 hover:bg-red-600' },
-    warning: { bg: 'bg-amber-50',   icon: 'bg-amber-100 text-amber-600', btn: 'bg-amber-500 hover:bg-amber-600' },
+    danger: { bg: 'bg-red-50', icon: 'bg-red-100 text-red-600', btn: 'bg-red-500 hover:bg-red-600' },
+    warning: { bg: 'bg-amber-50', icon: 'bg-amber-100 text-amber-600', btn: 'bg-amber-500 hover:bg-amber-600' },
     success: { bg: 'bg-emerald-50', icon: 'bg-emerald-100 text-emerald-600', btn: 'bg-emerald-500 hover:bg-emerald-600' },
   }[variant];
   return (
@@ -54,6 +55,7 @@ function ConfirmModal({ open, onClose, onConfirm, title, description, confirmTex
 }
 
 export default function QuanLySanPhamPage() {
+  const { isAdmin, isSuperAdmin } = useAuthStore();
   const [danhSach, setDanhSach] = useState<SanPhamItem[]>([]);
   const [danhMuc, setDanhMuc] = useState<DanhMuc[]>([]);
   const [thuongHieu, setThuongHieu] = useState<ThuongHieu[]>([]);
@@ -110,14 +112,14 @@ export default function QuanLySanPhamPage() {
   const loadBienTheData = async (sp: SanPhamItem) => {
     setLoadingBienThe(true);
     try {
-      const [ktRes, msRes, detailRes] = await Promise.all([
+      const [ktRes, msRes, bienTheRes] = await Promise.all([
         thuocTinhApi.danhSachKichThuoc(),
         thuocTinhApi.danhSachMauSac(),
-        adminApi.chiTietAdmin(sp.id),
+        adminApi.danhSachBienTheAdmin(sp.id),
       ]);
       setBtKichThuocOptions(ktRes.data.duLieu || []);
       setBtMauSacOptions(msRes.data.duLieu || []);
-      setBienTheModalList(detailRes.data.duLieu?.bienThe || []);
+      setBienTheModalList(bienTheRes.data.duLieu || []);
     } catch {
       toast.error('Không thể tải biến thể sản phẩm');
     } finally {
@@ -147,9 +149,9 @@ export default function QuanLySanPhamPage() {
         macDinh: bt.macDinh,
       })));
       toast.success(`Đã lưu ${rows.length} biến thể`);
-      if (selectedSanPham.duongDan) {
-        const detailRes = await adminApi.chiTietAdmin(selectedSanPham.id);
-        setBienTheModalList(detailRes.data.duLieu?.bienThe || []);
+      if (selectedSanPham.id) {
+        const bienTheRes = await adminApi.danhSachBienTheAdmin(selectedSanPham.id);
+        setBienTheModalList(bienTheRes.data.duLieu || []);
       }
     } catch {
       toast.error('Lỗi lưu biến thể');
@@ -202,7 +204,7 @@ export default function QuanLySanPhamPage() {
         <div className="flex gap-2">
           <label className={`btn-secondary flex items-center gap-2 text-sm shadow-sm cursor-pointer ${importing ? 'opacity-50' : 'border-indigo-200 text-indigo-700 hover:bg-indigo-50'} transition-colors`}>
             {importing ? (
-              <div className="w-4 h-4 rounded-full border-2 border-indigo-600 border-t-transparent animate-spin"/>
+              <div className="w-4 h-4 rounded-full border-2 border-indigo-600 border-t-transparent animate-spin" />
             ) : (
               <UploadCloud className="w-4 h-4" />
             )}
@@ -215,12 +217,14 @@ export default function QuanLySanPhamPage() {
           >
             <Download className="w-4 h-4" /> Xuất Excel
           </button>
-          <button
-            onClick={() => { setEditingSanPham(null); setShowForm(true); }}
-            className="btn-primary flex items-center gap-2 text-sm shadow-sm"
-          >
-            <Plus className="w-4 h-4" /> Thêm sản phẩm
-          </button>
+          {(isAdmin() || isSuperAdmin()) && (
+            <button
+              onClick={() => { setEditingSanPham(null); setShowForm(true); }}
+              className="btn-primary flex items-center gap-2 text-sm shadow-sm"
+            >
+              <Plus className="w-4 h-4" /> Thêm sản phẩm
+            </button>
+          )}
         </div>
       </div>
 
@@ -258,7 +262,7 @@ export default function QuanLySanPhamPage() {
       {showForm && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-          onClick={() => setShowForm(false)}
+          onClick={() => { setShowForm(false); load(); }}
         >
           <div
             className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
@@ -274,7 +278,7 @@ export default function QuanLySanPhamPage() {
                 </p>
               </div>
               <button
-                onClick={() => setShowForm(false)}
+                onClick={() => { setShowForm(false); load(); }}
                 className="p-1.5 rounded-full hover:bg-gray-100 text-gray-500"
                 aria-label="Đóng"
               >
@@ -290,7 +294,7 @@ export default function QuanLySanPhamPage() {
                 thuongHieu={thuongHieu}
                 chatLieu={chatLieu}
                 onSave={() => { setShowForm(false); load(); }}
-                onCancel={() => setShowForm(false)}
+                onCancel={() => { setShowForm(false); load(); }}
               />
             </div>
           </div>
@@ -314,6 +318,7 @@ export default function QuanLySanPhamPage() {
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Sản phẩm</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Danh mục</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Giá</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Số lượng</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Trạng thái</th>
                 <th className="px-4 py-3 w-44"></th>
               </tr>
@@ -339,6 +344,9 @@ export default function QuanLySanPhamPage() {
                       <span className="text-xs text-gray-400 line-through ml-2">{formatCurrency(sp.giaGoc)}</span>
                     )}
                   </td>
+                  <td className="px-4 py-3 font-medium text-gray-900">
+                    {sp.soLuong || 0}
+                  </td>
                   <td className="px-4 py-3">
                     <button
                       onClick={() => setConfirmSP(sp)}
@@ -346,16 +354,13 @@ export default function QuanLySanPhamPage() {
                       className="group flex items-center gap-2 cursor-pointer"
                       title={sp.trangThaiSanPham === 'DANG_BAN' ? 'Bấm để ngừng bán' : 'Bấm để mở bán'}
                     >
-                      <div className={`relative w-10 h-[22px] rounded-full transition-colors duration-200 ${
-                        sp.trangThaiSanPham === 'DANG_BAN' ? 'bg-emerald-500' : 'bg-gray-300'
-                      }`}>
-                        <div className={`absolute top-[2px] w-[18px] h-[18px] rounded-full bg-white shadow transition-transform duration-200 ${
-                          sp.trangThaiSanPham === 'DANG_BAN' ? 'translate-x-[20px]' : 'translate-x-[2px]'
-                        }`} />
+                      <div className={`relative w-10 h-[22px] rounded-full transition-colors duration-200 ${sp.trangThaiSanPham === 'DANG_BAN' ? 'bg-emerald-500' : 'bg-gray-300'
+                        }`}>
+                        <div className={`absolute top-[2px] w-[18px] h-[18px] rounded-full bg-white shadow transition-transform duration-200 ${sp.trangThaiSanPham === 'DANG_BAN' ? 'translate-x-[20px]' : 'translate-x-[2px]'
+                          }`} />
                       </div>
-                      <span className={`text-xs font-medium ${
-                        sp.trangThaiSanPham === 'DANG_BAN' ? 'text-emerald-600' : 'text-gray-400'
-                      }`}>
+                      <span className={`text-xs font-medium ${sp.trangThaiSanPham === 'DANG_BAN' ? 'text-emerald-600' : 'text-gray-400'
+                        }`}>
                         {trangThaiSanPhamLabel[sp.trangThaiSanPham] || sp.trangThaiSanPham}
                       </span>
                     </button>
@@ -368,25 +373,29 @@ export default function QuanLySanPhamPage() {
                       >
                         <Eye className="w-4 h-4" />
                       </a>
-                      <button onClick={() => { setEditingSanPham(sp); setShowForm(true); }}
-                        className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                        title="Sửa sản phẩm"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => openBienTheModal(sp)}
-                        className="p-2 rounded-lg text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors"
-                        title="Quản lý biến thể"
-                      >
-                        <Layers className="w-4 h-4" />
-                      </button>
+                      {(isAdmin() || isSuperAdmin()) && (
+                        <>
+                          <button onClick={() => { setEditingSanPham(sp); setShowForm(true); }}
+                            className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                            title="Sửa sản phẩm"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => openBienTheModal(sp)}
+                            className="p-2 rounded-lg text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors"
+                            title="Quản lý biến thể"
+                          >
+                            <Layers className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
               ))}
               {danhSach.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="text-center py-12">
+                  <td colSpan={6} className="text-center py-12">
                     <div className="text-gray-900 font-medium">Chưa có sản phẩm</div>
                     <div className="text-sm text-gray-500 mt-1">Thử đổi bộ lọc hoặc bấm “Thêm sản phẩm”.</div>
                   </td>
@@ -411,7 +420,7 @@ export default function QuanLySanPhamPage() {
       {showBienTheModal && selectedSanPham && (
         <BienTheSanPhamModal
           open={showBienTheModal}
-          onClose={() => setShowBienTheModal(false)}
+          onClose={() => { setShowBienTheModal(false); load(); }}
           tenSanPham={selectedSanPham.tenSanPham}
           maSanPham={selectedSanPham.maSanPham}
           kichThuocOptions={btKichThuocOptions}
@@ -435,14 +444,12 @@ export default function QuanLySanPhamPage() {
             onClick={e => e.stopPropagation()}
           >
             {/* Header with icon */}
-            <div className={`px-6 pt-6 pb-4 flex flex-col items-center text-center ${
-              confirmSP.trangThaiSanPham === 'DANG_BAN' ? 'bg-amber-50' : 'bg-emerald-50'
-            }`}>
-              <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-3 ${
-                confirmSP.trangThaiSanPham === 'DANG_BAN'
+            <div className={`px-6 pt-6 pb-4 flex flex-col items-center text-center ${confirmSP.trangThaiSanPham === 'DANG_BAN' ? 'bg-amber-50' : 'bg-emerald-50'
+              }`}>
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-3 ${confirmSP.trangThaiSanPham === 'DANG_BAN'
                   ? 'bg-amber-100 text-amber-600'
                   : 'bg-emerald-100 text-emerald-600'
-              }`}>
+                }`}>
                 <AlertTriangle className="w-7 h-7" />
               </div>
               <h3 className="text-lg font-bold text-gray-900">
@@ -482,11 +489,10 @@ export default function QuanLySanPhamPage() {
               <button
                 onClick={() => doToggle(confirmSP)}
                 disabled={togglingId === confirmSP.id}
-                className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors ${
-                  confirmSP.trangThaiSanPham === 'DANG_BAN'
+                className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors ${confirmSP.trangThaiSanPham === 'DANG_BAN'
                     ? 'bg-amber-500 hover:bg-amber-600'
                     : 'bg-emerald-500 hover:bg-emerald-600'
-                } disabled:opacity-50`}
+                  } disabled:opacity-50`}
               >
                 {togglingId === confirmSP.id
                   ? 'Đang xử lý...'
@@ -497,204 +503,6 @@ export default function QuanLySanPhamPage() {
         </div>
       )}
     </div>
-  );
-}
-
-// VariantRow - Inline Edit Component
-function VariantRow({
-  bt, kichThuocOptions, mauSacOptions, onReload, setConfirmDeleteBT,
-  handleImageUpload, deletingAnhId, uploadingBTId, setConfirmDeleteImg, cloneToDraft
-}: {
-  bt: BienTheType;
-  kichThuocOptions: KichThuoc[];
-  mauSacOptions: MauSac[];
-  onReload: () => Promise<void> | void;
-  setConfirmDeleteBT: (bt: BienTheType) => void;
-  handleImageUpload: (id: number, f: File) => Promise<void>;
-  deletingAnhId: number | null;
-  uploadingBTId: number | null;
-  setConfirmDeleteImg: (x: any) => void;
-  cloneToDraft: (bt: BienTheType) => void;
-}) {
-  const [editingField, setEditingField] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState<string>('');
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [savingField, setSavingField] = useState(false);
-
-  const startEdit = (field: string, val: string) => {
-    setEditingField(field);
-    setEditValue(val);
-  };
-
-  const saveEdit = async () => {
-    if (!editingField || savingField) return;
-    let finalValue: any = editValue;
-    if (editingField === 'gia') {
-       finalValue = Number(editValue);
-       if (!finalValue || finalValue <= 0) { toast.error('Giá sai'); setEditingField(null); return; }
-       if (finalValue === bt.gia) { setEditingField(null); return; }
-    } else if (editingField === 'soLuongTon') {
-       finalValue = Number(editValue);
-       if (finalValue < 0 || isNaN(finalValue)) { toast.error('Số lượng sai'); setEditingField(null); return; }
-       if (finalValue === bt.soLuongTon) { setEditingField(null); return; }
-    } else if (editingField === 'kichThuocId') {
-       finalValue = Number(editValue);
-       if (finalValue === bt.kichThuoc?.id) { setEditingField(null); return; }
-    } else if (editingField === 'mauSacId') {
-       finalValue = Number(editValue);
-       if (finalValue === bt.mauSac?.id) { setEditingField(null); return; }
-    }
-
-    setSavingField(true);
-    try {
-      const payload: any = {
-        kichThuocId: editingField === 'kichThuocId' ? finalValue : (bt.kichThuoc?.id || null),
-        mauSacId: editingField === 'mauSacId' ? finalValue : (bt.mauSac?.id || null),
-        chatLieuId: null,
-        gia: editingField === 'gia' ? finalValue : bt.gia,
-        soLuongTon: editingField === 'soLuongTon' ? finalValue : bt.soLuongTon,
-        macDinh: bt.macDinh,
-        trangThai: bt.trangThai !== false
-      };
-      await adminApi.capNhatBienThe(bt.id, payload);
-      toast.success('Đã cập nhật');
-      await onReload();
-    } catch {
-      toast.error('Lỗi khi lưu');
-    } finally {
-      setSavingField(false);
-      setEditingField(null);
-    }
-  };
-
-  const toggleTrangThai = async () => {
-    try {
-      const current = bt.trangThai !== false;
-      const payload = {
-        kichThuocId: bt.kichThuoc?.id || null,
-        mauSacId: bt.mauSac?.id || null,
-        chatLieuId: null,
-        gia: bt.gia,
-        soLuongTon: bt.soLuongTon,
-        macDinh: bt.macDinh,
-        trangThai: !current
-      };
-      await adminApi.capNhatBienThe(bt.id, payload);
-      toast.success(!current ? 'Đã bật' : 'Đã ẩn (ngừng bán)');
-      await onReload();
-    } catch {
-      toast.error('Lỗi chuyển trạng thái');
-    }
-  };
-
-  const setMacDinh = async () => {
-    try {
-       const payload = {
-         kichThuocId: bt.kichThuoc?.id || null,
-         mauSacId: bt.mauSac?.id || null,
-         chatLieuId: null,
-         gia: bt.gia,
-         soLuongTon: bt.soLuongTon,
-         macDinh: true,
-         trangThai: bt.trangThai !== false
-       };
-       await adminApi.capNhatBienThe(bt.id, payload);
-       toast.success('Đã đặt làm mặc định');
-       setMenuOpen(false);
-       await onReload();
-    } catch {
-       toast.error('Lỗi đặt mặc định');
-    }
-  };
-
-  return (
-    <tr className="hover:bg-gray-50 group border-b border-gray-100">
-      <td className="px-3 py-2 text-gray-600">
-         #{bt.id}
-         {bt.macDinh && <span className="ml-2 badge badge-blue text-[9px] px-1 py-0 block w-fit mt-1">MĐ</span>}
-      </td>
-      {/* Kich Thuoc */}
-      <td className="px-3 py-2 cursor-pointer hover:bg-gray-100 relative group/cell" onClick={() => { if(editingField !== 'kichThuocId') startEdit('kichThuocId', String(bt.kichThuoc?.id||''))}}>
-        {editingField === 'kichThuocId' ? (
-           <select autoFocus className="input-field text-xs px-1 py-1 h-7 min-w-[70px]" value={editValue} onChange={e=>setEditValue(e.target.value)} onBlur={saveEdit}>
-             {kichThuocOptions.map(k => <option key={k.id} value={k.id}>{k.kichCo}</option>)}
-           </select>
-        ) : (
-           <div className="flex items-center gap-1">{(bt.kichThuoc?.kichCo || bt.kichThuoc?.tenKichThuoc) || '—'}<Pencil className="w-3 h-3 text-gray-300 opacity-0 group-hover/cell:opacity-100" /></div>
-        )}
-      </td>
-      {/* Mau Sac */}
-      <td className="px-3 py-2 cursor-pointer hover:bg-gray-100 relative group/cell" onClick={() => { if(editingField !== 'mauSacId') startEdit('mauSacId', String(bt.mauSac?.id||''))}}>
-        {editingField === 'mauSacId' ? (
-           <select autoFocus className="input-field text-xs px-1 py-1 h-7 min-w-[80px]" value={editValue} onChange={e=>setEditValue(e.target.value)} onBlur={saveEdit}>
-             {mauSacOptions.map(m => <option key={m.id} value={m.id}>{m.tenMau}</option>)}
-           </select>
-        ) : (
-           <div className="flex items-center gap-1">{(bt.mauSac?.tenMau || bt.mauSac?.tenMauSac) || '—'}<Pencil className="w-3 h-3 text-gray-300 opacity-0 group-hover/cell:opacity-100" /></div>
-        )}
-      </td>
-      {/* Gia */}
-      <td className="px-3 py-2 cursor-pointer hover:bg-gray-100 relative group/cell" onClick={() => { if(editingField !== 'gia') startEdit('gia', String(bt.gia))}}>
-        {editingField === 'gia' ? (
-           <input autoFocus type="number" className="input-field text-xs px-1 py-1 h-7 w-20" value={editValue} onChange={e=>setEditValue(e.target.value)} onBlur={saveEdit} onKeyDown={e=>e.key === 'Enter' && saveEdit()} />
-        ) : (
-           <div className="flex items-center gap-1 font-semibold text-indigo-600">{bt.gia != null ? formatCurrency(bt.gia) : '—'}<Pencil className="w-3 h-3 text-indigo-300 opacity-0 group-hover/cell:opacity-100" /></div>
-        )}
-      </td>
-      {/* So Luong Ton */}
-      <td className="px-3 py-2 cursor-pointer hover:bg-gray-100 relative group/cell" onClick={() => { if(editingField !== 'soLuongTon') startEdit('soLuongTon', String(bt.soLuongTon))}}>
-        {editingField === 'soLuongTon' ? (
-           <input autoFocus type="number" className="input-field text-xs px-1 py-1 h-7 w-16" value={editValue} onChange={e=>setEditValue(e.target.value)} onBlur={saveEdit} onKeyDown={e=>e.key === 'Enter' && saveEdit()} />
-        ) : (
-           <div className="flex items-center gap-1 text-gray-600">{bt.soLuongTon}<Pencil className="w-3 h-3 text-gray-300 opacity-0 group-hover/cell:opacity-100" /></div>
-        )}
-      </td>
-      {/* Trang thai toggle */}
-      <td className="px-3 py-2">
-        <label className="relative inline-flex items-center cursor-pointer mb-0">
-          <input type="checkbox" className="sr-only peer" checked={bt.trangThai !== false} onChange={toggleTrangThai} />
-          <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div>
-          <span className="ml-2 text-[10px] font-medium text-gray-700">{bt.trangThai !== false ? 'ON' : 'OFF'}</span>
-        </label>
-      </td>
-      {/* Hinh Anh */}
-      <td className="px-3 py-2">
-         <div className="flex flex-wrap gap-1 items-center">
-          {bt.hinhAnh?.map(img => (
-            <div key={img.id} className="relative group/img w-10 h-10">
-              {/* @ts-ignore */}
-              <img src={img.duongDan?.includes('/') ? img.duongDan : ('http://localhost:8080/api/files/' + img.duongDan)} alt="" className={`w-10 h-10 rounded-md object-cover border-2 ${img.laAnhChinh ? 'border-indigo-400' : 'border-gray-100'}`} onError={(e) => { e.currentTarget.src = '/img/no-image.png'; }} />
-              <button type="button" onClick={() => setConfirmDeleteImg({ id: img.id, url: img.duongDan })} disabled={deletingAnhId === img.id} className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity disabled:opacity-60" title="Xóa ảnh">
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-          ))}
-
-          <label className="w-10 h-10 rounded-md border-2 border-dashed border-gray-200 flex items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
-            {uploadingBTId === bt.id ? (
-              <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Upload className="w-4 h-4 text-gray-400" />
-            )}
-            <input type="file" accept="image/*" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (file) void handleImageUpload(bt.id, file); e.target.value = ''; }} />
-          </label>
-        </div>
-      </td>
-      {/* Action ... Menu */}
-      <td className="px-3 py-2 relative text-right">
-         <button onClick={(e) => setMenuOpen(!menuOpen)} onBlur={() => setTimeout(()=>setMenuOpen(false), 200)} className="text-gray-400 p-1.5 rounded-full hover:bg-gray-100 hover:text-gray-700">
-            <MoreVertical className="w-4 h-4" />
-         </button>
-         {menuOpen && (
-           <div className="absolute right-6 top-6 w-36 bg-white border border-gray-100 shadow-xl rounded-md overflow-hidden z-20 text-left py-1" onMouseDown={e=>e.preventDefault()}>
-             <button onClick={setMacDinh} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">Đặt làm mặc định</button>
-             <button onClick={() => cloneToDraft(bt)} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">Nhân bản</button>
-             <div className="border-t border-gray-100 my-1"></div>
-             <button onClick={() => { setConfirmDeleteBT(bt); setMenuOpen(false); }} className="block w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50">Xóa biến thể</button>
-           </div>
-         )}
-      </td>
-    </tr>
   );
 }
 
@@ -743,9 +551,11 @@ function BienTheSanPhamModal({
   const [saving, setSaving] = useState(false);
   const [uploadingBTId, setUploadingBTId] = useState<number | null>(null);
   const [deletingAnhId, setDeletingAnhId] = useState<number | null>(null);
+  const [editingBTId, setEditingBTId] = useState<number | null>(null);
   // Confirm states
   const [confirmDeleteBT, setConfirmDeleteBT] = useState<BienTheType | null>(null);
   const [confirmDeleteImg, setConfirmDeleteImg] = useState<{ id: number; url: string } | null>(null);
+  const [editBTForm, setEditBTForm] = useState<BienTheForm>({ ...EMPTY_BT });
 
   // Bulk selection → auto-generate combinations
   const [pickSizes, setPickSizes] = useState<string[]>([]);
@@ -891,18 +701,51 @@ function BienTheSanPhamModal({
     setFn(prev => (prev.includes(value) ? prev.filter((x: string) => x !== value) : [...prev, value]));
   };
 
-  const cloneToDraft = (bt: BienTheType) => {
-    setRows(prev => [{
+  const startEditVariant = (bt: BienTheType) => {
+    setEditingBTId(bt.id);
+    setEditBTForm({
       kichThuocId: bt.kichThuoc?.id != null ? String(bt.kichThuoc.id) : '',
       mauSacId: bt.mauSac?.id != null ? String(bt.mauSac.id) : '',
       gia: bt.gia != null ? String(bt.gia) : '',
       soLuongTon: bt.soLuongTon != null ? String(bt.soLuongTon) : '0',
-      macDinh: false,
-    }, ...prev]);
-    toast.success('Đã đưa bản sao vào danh sách tạo (trên cùng).');
+      macDinh: !!bt.macDinh,
+    });
   };
 
+  const updateVariant = async (bienTheId: number) => {
+    // Validate edit form before sending
+    if (!editBTForm.kichThuocId || !editBTForm.mauSacId) {
+      toast.error('Chọn đầy đủ Size và Màu trước khi lưu');
+      return;
+    }
+    const giaNum = Number(editBTForm.gia);
+    const slNum = Number(editBTForm.soLuongTon);
+    if (!Number.isFinite(giaNum) || giaNum <= 0) {
+      toast.error('Giá phải lớn hơn 0');
+      return;
+    }
+    if (!Number.isFinite(slNum) || slNum < 0) {
+      toast.error('Số lượng tồn không được âm');
+      return;
+    }
 
+    try {
+      await adminApi.capNhatBienThe(bienTheId, {
+        kichThuocId: editBTForm.kichThuocId ? Number(editBTForm.kichThuocId) : null,
+        mauSacId: editBTForm.mauSacId ? Number(editBTForm.mauSacId) : null,
+        chatLieuId: null,
+        gia: giaNum,
+        soLuongTon: slNum,
+        macDinh: editBTForm.macDinh,
+      });
+      toast.success('Cập nhật biến thể thành công');
+      setEditingBTId(null);
+      await onReload();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { thongBao?: string } } })?.response?.data?.thongBao || 'Lỗi cập nhật biến thể';
+      toast.error(msg);
+    }
+  };
 
   const deleteVariant = async (bienTheId: number) => {
     setConfirmDeleteBT(null);
@@ -910,9 +753,8 @@ function BienTheSanPhamModal({
       await adminApi.xoaBienThe(bienTheId);
       toast.success('Đã xóa biến thể');
       await onReload();
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { thongBao?: string } } })?.response?.data?.thongBao || 'Lỗi xóa biến thể';
-      toast.error(msg);
+    } catch {
+      toast.error('Lỗi xóa biến thể');
     }
   };
 
@@ -960,6 +802,26 @@ function BienTheSanPhamModal({
       toast.error('Lỗi xóa ảnh');
     } finally {
       setDeletingAnhId(null);
+    }
+  };
+
+  const toggleTrangThaiBienThe = async (bt: BienTheType) => {
+    try {
+      const isCurrentlyActive = bt.trangThai ?? true;
+      const data = {
+        kichThuocId: bt.kichThuoc?.id,
+        mauSacId: bt.mauSac?.id,
+        chatLieuId: bt.chatLieu?.id,
+        gia: bt.gia,
+        soLuongTon: bt.soLuongTon,
+        macDinh: bt.macDinh,
+        trangThai: !isCurrentlyActive
+      };
+      await adminApi.capNhatBienThe(bt.id, data);
+      toast.success(isCurrentlyActive ? 'Đã tắt biến thể (ẩn)' : 'Đã bật biến thể (sẵn sàng bán)');
+      await onReload();
+    } catch {
+      toast.error('Lỗi chuyển trạng thái biến thể');
     }
   };
 
@@ -1013,11 +875,10 @@ function BienTheSanPhamModal({
                           key={k.id}
                           type="button"
                           onClick={() => togglePick(id, setPickSizes)}
-                          className={`px-2 py-1 rounded-full text-xs border transition-colors ${
-                            active ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-300'
-                          }`}
+                          className={`px-2 py-1 rounded-full text-xs border transition-colors ${active ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-300'
+                            }`}
                         >
-                          {k.kichCo}
+                          {(k as any).tenKichThuoc || k.kichCo}
                         </button>
                       );
                     })}
@@ -1035,11 +896,10 @@ function BienTheSanPhamModal({
                           key={m.id}
                           type="button"
                           onClick={() => togglePick(id, setPickColors)}
-                          className={`px-2 py-1 rounded-full text-xs border transition-colors ${
-                            active ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-300'
-                          }`}
+                          className={`px-2 py-1 rounded-full text-xs border transition-colors ${active ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-300'
+                            }`}
                         >
-                          {m.tenMau}
+                          {(m as any).tenMauSac || m.tenMau}
                         </button>
                       );
                     })}
@@ -1106,7 +966,7 @@ function BienTheSanPhamModal({
                     <option value="">Kích thước</option>
                     {kichThuocOptions.map(k => (
                       <option key={k.id} value={k.id}>
-                        {k.kichCo}
+                        {k.tenKichThuoc || k.kichCo}
                       </option>
                     ))}
                   </select>
@@ -1119,7 +979,7 @@ function BienTheSanPhamModal({
                     <option value="">Màu sắc</option>
                     {mauSacOptions.map(m => (
                       <option key={m.id} value={m.id}>
-                        {m.tenMau}
+                        {m.tenMauSac || m.tenMau}
                       </option>
                     ))}
                   </select>
@@ -1172,7 +1032,6 @@ function BienTheSanPhamModal({
                   Đang tải dữ liệu biến thể...
                 </div>
               ) : (
-                <>
                 <table className="w-full text-xs">
                   <thead className="bg-gray-50">
                     <tr>
@@ -1181,41 +1040,192 @@ function BienTheSanPhamModal({
                       <th className="px-3 py-2 text-left text-gray-500">Màu sắc</th>
                       <th className="px-3 py-2 text-left text-gray-500">Giá</th>
                       <th className="px-3 py-2 text-left text-gray-500">Số lượng</th>
-                      <th className="px-3 py-2 text-left text-gray-500">Trạng thái</th>
+                      <th className="px-3 py-2 text-left text-gray-500">Trạng thái <span className="font-normal text-[10px] block opacity-70">(Bật=Dùng / Tắt=Không dùng)</span></th>
+                      <th className="px-3 py-2 text-left text-gray-500">Mặc định</th>
+                      <th className="px-3 py-2 text-left text-gray-500">Thao tác</th>
                       <th className="px-3 py-2 text-left text-gray-500">Ảnh</th>
-                      <th className="px-3 py-2 text-center text-gray-500 w-10">⋯</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {bienTheDaCo.map(bt => (
-                      <VariantRow
-                        key={bt.id}
-                        bt={bt}
-                        kichThuocOptions={kichThuocOptions}
-                        mauSacOptions={mauSacOptions}
-                        onReload={onReload}
-                        setConfirmDeleteBT={setConfirmDeleteBT}
-                        handleImageUpload={handleImageUpload}
-                        deletingAnhId={deletingAnhId}
-                        uploadingBTId={uploadingBTId}
-                        setConfirmDeleteImg={setConfirmDeleteImg}
-                        cloneToDraft={cloneToDraft}
-                      />
+                      <Fragment key={bt.id}>
+                        <tr className="hover:bg-gray-50">
+                          <td className="px-3 py-2 text-gray-600">{bt.id}</td>
+                          <td className="px-3 py-2">
+                            {bt.kichThuoc?.tenKichThuoc || bt.kichThuoc?.kichCo || '—'}
+                          </td>
+                          <td className="px-3 py-2">
+                            {bt.mauSac?.tenMauSac || bt.mauSac?.tenMau || '—'}
+                          </td>
+                          <td className="px-3 py-2 font-semibold text-indigo-600">
+                            {bt.gia != null ? formatCurrency(bt.gia) : '—'}
+                          </td>
+                          <td className="px-3 py-2 text-gray-600">
+                            {bt.soLuongTon}
+                          </td>
+                          <td className="px-3 py-2">
+                            <label className="relative inline-flex items-center cursor-pointer group hover:opacity-80 transition-opacity">
+                              <input
+                                type="checkbox"
+                                className="sr-only peer"
+                                checked={bt.trangThai ?? true}
+                                onChange={() => toggleTrangThaiBienThe(bt)}
+                              />
+                              <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 shadow-inner"></div>
+                              <span className={`ml-2 text-[11px] font-bold tracking-wide transition-colors ${bt.trangThai ?? true ? 'text-emerald-600' : 'text-gray-400'}`}>
+                                {bt.trangThai ?? true ? 'ON' : 'OFF'}
+                              </span>
+                            </label>
+                          </td>
+                          <td className="px-3 py-2">
+                            {bt.macDinh ? (
+                              <span className="badge badge-blue text-[11px]">Mặc định</span>
+                            ) : (
+                              <span className="text-[11px] text-gray-400">Không</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex gap-1 items-center">
+                              <button
+                                type="button"
+                                onClick={() => startEditVariant(bt)}
+                                className="px-2 py-1 text-[11px] rounded border border-gray-200 text-gray-600 hover:border-indigo-400 hover:text-indigo-700 hover:bg-indigo-50 transition-colors"
+                              >
+                                Sửa
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex flex-wrap gap-1 items-center">
+                              {(bt.hinhAnh || bt.danhSachHinhAnh)?.map(img => (
+                                <div key={img.id} className="relative group w-10 h-10">
+                                  <img
+                                    src={getImageUrl(img.duongDan)}
+                                    alt=""
+                                    className={`w-10 h-10 rounded-md object-cover border-2 ${img.laAnhChinh ? 'border-indigo-400' : 'border-gray-100'}`}
+                                    onError={handleImgError}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmDeleteImg({ id: img.id, url: img.duongDan })}
+                                    disabled={deletingAnhId === img.id}
+                                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-60"
+                                    title="Xóa ảnh"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                  {img.laAnhChinh && (
+                                    <span className="absolute bottom-0 left-0 right-0 bg-indigo-500 text-white text-center text-[8px] rounded-b-md">
+                                      Chính
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+
+                              <label className="w-10 h-10 rounded-md border-2 border-dashed border-gray-200 flex items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
+                                {uploadingBTId === bt.id ? (
+                                  <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                                ) : (
+                                  <Upload className="w-4 h-4 text-gray-400" />
+                                )}
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={e => {
+                                    const file = e.target.files?.[0];
+                                    if (file) void handleImageUpload(bt.id, file);
+                                    e.target.value = '';
+                                  }}
+                                />
+                              </label>
+                            </div>
+                          </td>
+                        </tr>
+                        {editingBTId === bt.id && (
+                          <tr>
+                            <td colSpan={10} className="px-3 py-2 bg-indigo-50/40">
+                              <div className="grid grid-cols-3 md:grid-cols-7 gap-2 items-end">
+                                <select
+                                  className="input-field text-xs"
+                                  value={editBTForm.kichThuocId}
+                                  onChange={e => setEditBTForm(prev => ({ ...prev, kichThuocId: e.target.value }))}
+                                >
+                                  <option value="">Kích thước</option>
+                                  {kichThuocOptions.map(k => (
+                                    <option key={k.id} value={k.id}>
+                                      {k.tenKichThuoc || k.kichCo}
+                                    </option>
+                                  ))}
+                                </select>
+                                <select
+                                  className="input-field text-xs"
+                                  value={editBTForm.mauSacId}
+                                  onChange={e => setEditBTForm(prev => ({ ...prev, mauSacId: e.target.value }))}
+                                >
+                                  <option value="">Màu sắc</option>
+                                  {mauSacOptions.map(m => (
+                                    <option key={m.id} value={m.id}>
+                                      {m.tenMauSac || m.tenMau}
+                                    </option>
+                                  ))}
+                                </select>
+                                <input
+                                  type="number"
+                                  className="input-field text-xs"
+                                  placeholder="Giá"
+                                  value={editBTForm.gia}
+                                  onChange={e => setEditBTForm(prev => ({ ...prev, gia: e.target.value }))}
+                                />
+                                <input
+                                  type="number"
+                                  className="input-field text-xs"
+                                  placeholder="Số lượng"
+                                  value={editBTForm.soLuongTon}
+                                  onChange={e => setEditBTForm(prev => ({ ...prev, soLuongTon: e.target.value }))}
+                                />
+                                <label className="flex items-center gap-1 text-[11px] text-gray-600">
+                                  <input
+                                    type="checkbox"
+                                    checked={editBTForm.macDinh}
+                                    onChange={e => setEditBTForm(prev => ({ ...prev, macDinh: e.target.checked }))}
+                                  />
+                                  Mặc định
+                                </label>
+                                <div className="flex gap-2 justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={() => updateVariant(bt.id)}
+                                    className="btn-primary text-xs px-3 py-2"
+                                  >
+                                    Lưu
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingBTId(null)}
+                                    className="btn-secondary text-xs px-3 py-2"
+                                  >
+                                    Hủy
+                                  </button>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     ))}
                     {bienTheDaCo.length === 0 && (
                       <tr>
-                        <td colSpan={8} className="px-3 py-6 text-center text-gray-400">
+                        <td
+                          colSpan={10}
+                          className="px-3 py-6 text-center text-gray-400"
+                        >
                           Chưa có biến thể nào
                         </td>
                       </tr>
                     )}
                   </tbody>
                 </table>
-                <div className="p-2 bg-gray-50 text-[10px] text-gray-500 border-t border-gray-100 flex items-center justify-between">
-                   <span>OFF = biến thể không hiển thị trên cửa hàng</span>
-                   <span>Click trực tiếp vào giá, số lượng, kích thước, màu sắc để sửa</span>
-                </div>
-                </>
               )}
             </div>
           </div>
@@ -1240,7 +1250,7 @@ function BienTheSanPhamModal({
         onClose={() => setConfirmDeleteBT(null)}
         onConfirm={() => confirmDeleteBT && deleteVariant(confirmDeleteBT.id)}
         title="Xóa biến thể?"
-        description={`Bạn có chắc muốn xóa biến thể ${(confirmDeleteBT?.kichThuoc?.kichCo || confirmDeleteBT?.kichThuoc?.tenKichThuoc) || ''} - ${(confirmDeleteBT?.mauSac?.tenMau || confirmDeleteBT?.mauSac?.tenMauSac) || ''}? Hành động này không thể hoàn tác.`}
+        description={`Bạn có chắc muốn xóa biến thể ${confirmDeleteBT?.kichThuoc?.tenKichThuoc || ''} - ${confirmDeleteBT?.mauSac?.tenMauSac || ''}?`}
         confirmText="Xác nhận xóa"
       />
 
@@ -1289,10 +1299,9 @@ function SanPhamForm({ inModal = false, editingSanPham, danhMuc, thuongHieu, cha
   useEffect(() => {
     if (!editingSanPham) return;
     setLoadingDetail(true);
-    adminApi.chiTietAdmin(editingSanPham.id)
+    sanPhamApi.chiTiet(editingSanPham.duongDan)
       .then(r => {
-        const payload = r.data.duLieu as any;
-        const sp = payload?.sanPham || payload;
+        const sp = r.data.duLieu;
         if (!sp) return;
         setForm({
           tenSanPham: sp.tenSanPham || '',
@@ -1332,17 +1341,17 @@ function SanPhamForm({ inModal = false, editingSanPham, danhMuc, thuongHieu, cha
       return;
     }
 
-    const thuongHieuIdNum = form.thuongHieuId ? Number(form.thuongHieuId) : null;
-    if (thuongHieuIdNum != null && (!Number.isFinite(thuongHieuIdNum) || thuongHieuIdNum <= 0)) {
-      toast.error('Thương hiệu không hợp lệ');
+    if (!form.thuongHieuId) {
+      toast.error('Vui lòng chọn thương hiệu');
       return;
     }
+    const thuongHieuIdNum = Number(form.thuongHieuId);
 
-    const chatLieuIdNum = form.chatLieuId ? Number(form.chatLieuId) : null;
-    if (chatLieuIdNum != null && (!Number.isFinite(chatLieuIdNum) || chatLieuIdNum <= 0)) {
-      toast.error('Chất liệu không hợp lệ');
+    if (!form.chatLieuId) {
+      toast.error('Vui lòng chọn chất liệu');
       return;
     }
+    const chatLieuIdNum = Number(form.chatLieuId);
 
     setSaving(true);
     try {
@@ -1423,17 +1432,17 @@ function SanPhamForm({ inModal = false, editingSanPham, danhMuc, thuongHieu, cha
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Thương hiệu</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Thương hiệu *</label>
             <select className="input-field" value={form.thuongHieuId}
-              onChange={e => setForm({ ...form, thuongHieuId: e.target.value })}>
+              onChange={e => setForm({ ...form, thuongHieuId: e.target.value })} required>
               <option value="">-- Chọn --</option>
               {thuongHieu.map(th => <option key={th.id} value={th.id}>{th.tenThuongHieu}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Chất liệu</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Chất liệu *</label>
             <select className="input-field" value={form.chatLieuId}
-              onChange={e => setForm({ ...form, chatLieuId: e.target.value })}>
+              onChange={e => setForm({ ...form, chatLieuId: e.target.value })} required>
               <option value="">-- Chọn --</option>
               {chatLieu.map(cl => <option key={cl.id} value={cl.id}>{cl.tenChatLieu}</option>)}
             </select>

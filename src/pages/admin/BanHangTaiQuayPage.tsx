@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Search, Plus, Trash2, UserPlus, CreditCard, Banknote,
-  X, Minus, CheckCircle2, ShoppingCart, Tag, Ticket, Mail,
+  X, Minus, CheckCircle2, ShoppingCart, Tag, Ticket,
   Receipt, AlertCircle, Printer
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -78,7 +78,7 @@ export default function BanHangTaiQuayPage() {
   const [deleteModal, setDeleteModal] = useState<{ item: CartItem } | null>(null);
   const [deleteQty, setDeleteQty] = useState(1);
 
-  const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load hóa đơn chờ
   const loadHoaDonCho = useCallback(async () => {
@@ -161,7 +161,7 @@ export default function BanHangTaiQuayPage() {
       toast.error(err.response?.data?.thongBao || 'Lỗi khi hủy');
     }
   };
-  
+
 
   // ==== Tìm sản phẩm ====
   const handleProductSearch = (val: string) => {
@@ -180,7 +180,7 @@ export default function BanHangTaiQuayPage() {
     if (searchResults.length === 0 && !productQuery) {
       posService.timSanPham('').then(res => {
         setSearchResults(res.data.duLieu || []);
-      }).catch(() => {});
+      }).catch(() => { });
     }
   };
 
@@ -285,7 +285,7 @@ export default function BanHangTaiQuayPage() {
     if (val.length >= 2) {
       posService.timKhachHang(val).then(res => {
         setCustomerResults(res.data.duLieu || []);
-      }).catch(() => {});
+      }).catch(() => { });
     } else {
       setCustomerResults([]);
     }
@@ -353,6 +353,133 @@ export default function BanHangTaiQuayPage() {
   const tongPhaiTra = Math.max(0, (activeInvoice?.tongTien || 0) - (activeInvoice?.soTienGiamGia || 0));
   const tienThua = (parseFloat(amountPaid) || 0) - tongPhaiTra;
 
+  const getPrintStyles = () => {
+    return `<style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+      line-height: 1.6;
+      color: #1f2937;
+      background: white;
+    }
+    .invoice-container {
+      width: 8.5in;
+      padding: 0.75in;
+      margin: 0 auto;
+      background: white;
+    }
+    h1 { 
+      font-size: 42px; 
+      font-weight: 800; 
+      color: #1f2937; 
+      margin-bottom: 12px;
+      letter-spacing: -0.5px;
+    }
+    h2 { 
+      font-size: 18px; 
+      font-weight: 700; 
+      color: #4f46e5; 
+      margin-top: 24px; 
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    p { 
+      font-size: 15px; 
+      margin-bottom: 6px; 
+      color: #374151;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 24px 0;
+      background: white;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    }
+    thead { 
+      background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+    }
+    th {
+      border: none;
+      padding: 14px 12px;
+      text-align: left;
+      font-size: 14px;
+      font-weight: 700;
+      color: white;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    td {
+      border-bottom: 1px solid #e5e7eb;
+      padding: 12px;
+      text-align: left;
+      font-size: 14px;
+      color: #374151;
+      background: white;
+    }
+    tbody tr { background: white; }
+    tbody tr:nth-child(even) { background: #f9fafb; }
+    .summary {
+      width: 100%;
+      max-width: 380px;
+      margin-left: auto;
+    }
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      margin: 10px 0;
+      color: #374151;
+    }
+    .summary-row span:first-child { font-weight: 600; }
+    .summary-row span:last-child { font-weight: 500; }
+    .total-row {
+      font-weight: bold;
+      font-size: 18px;
+      border-top: 2px solid #e5e7eb;
+      padding-top: 12px;
+      margin-top: 12px;
+      color: #4f46e5;
+    }
+    .info-box {
+      background: #f3f4f6;
+      border-left: 4px solid #9ca3af;
+      padding: 16px;
+      margin: 16px 0;
+      border-radius: 6px;
+    }
+    .info-box-blue {
+      background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+      border-left: 4px solid #3b82f6;
+    }
+    .status-badge {
+      display: inline-block;
+      background: #4f46e5;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: bold;
+      margin-top: 6px;
+    }
+    footer {
+      text-align: center;
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 4px solid #4f46e5;
+      color: #6b7280;
+      font-size: 14px;
+    }
+    footer p:first-child { color: #1f2937; font-weight: 500; font-size: 16px; }
+  </style>`;
+  };
+
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col -m-6 bg-slate-100">
 
@@ -369,11 +496,10 @@ export default function BanHangTaiQuayPage() {
             <button
               key={inv.id}
               onClick={() => setActiveInvoiceId(inv.id)}
-              className={`group shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
-                activeInvoiceId === inv.id
-                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
-                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-indigo-400 hover:text-indigo-600'
-              }`}
+              className={`group shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${activeInvoiceId === inv.id
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
+                : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-indigo-400 hover:text-indigo-600'
+                }`}
             >
               <span>{inv.maDonHang}</span>
               {inv.soMatHang > 0 && (
@@ -662,11 +788,10 @@ export default function BanHangTaiQuayPage() {
                 <button
                   key={k}
                   onClick={() => setPaymentMethod(k)}
-                  className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold transition-all ${
-                    paymentMethod === k
-                      ? 'border-indigo-600 bg-indigo-600 text-white shadow-md'
-                      : 'border-slate-200 bg-slate-50 text-slate-500 hover:border-indigo-300 hover:text-indigo-600'
-                  }`}
+                  className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold transition-all ${paymentMethod === k
+                    ? 'border-indigo-600 bg-indigo-600 text-white shadow-md'
+                    : 'border-slate-200 bg-slate-50 text-slate-500 hover:border-indigo-300 hover:text-indigo-600'
+                    }`}
                 >
                   <Icon className="w-4 h-4" />
                   {label}
@@ -688,15 +813,15 @@ export default function BanHangTaiQuayPage() {
                 </button>
               </div>
               <input
-  type="number"
-  value={amountPaid}
-  onChange={(e) => setAmountPaid(e.target.value)}
-  placeholder="0"
-  className="w-full px-4 py-3 bg-white text-gray-900 font-black text-xl rounded-xl 
+                type="number"
+                value={amountPaid}
+                onChange={(e) => setAmountPaid(e.target.value)}
+                placeholder="0"
+                className="w-full px-4 py-3 bg-white text-gray-900 font-black text-xl rounded-xl 
              border border-gray-800 outline-none 
              focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 
              placeholder:text-gray-400"
-/>
+              />
               {tienThua > 0 && (
                 <div className="mt-2 flex justify-between items-center px-3 py-2 bg-emerald-50 rounded-xl border border-emerald-200">
                   <span className="text-emerald-700 font-bold text-sm">Tiền thừa</span>
@@ -763,11 +888,10 @@ export default function BanHangTaiQuayPage() {
                 <div
                   key={v.id}
                   onClick={() => v.duDieuKien && handleApVoucher(v.maVoucher)}
-                  className={`p-3.5 rounded-xl border transition-all ${
-                    v.duDieuKien
-                      ? 'border-indigo-200 bg-indigo-50 cursor-pointer hover:border-indigo-500 hover:shadow-md'
-                      : 'border-slate-200 bg-slate-50 opacity-55 cursor-not-allowed'
-                  }`}
+                  className={`p-3.5 rounded-xl border transition-all ${v.duDieuKien
+                    ? 'border-indigo-200 bg-indigo-50 cursor-pointer hover:border-indigo-500 hover:shadow-md'
+                    : 'border-slate-200 bg-slate-50 opacity-55 cursor-not-allowed'
+                    }`}
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-bold text-sm text-slate-800">{v.maVoucher}</span>
@@ -857,23 +981,20 @@ export default function BanHangTaiQuayPage() {
               <div className="flex gap-2 mt-3">
                 <button
                   onClick={() => setDeleteQty(1)}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                    deleteQty === 1 ? 'border-red-400 bg-red-50 text-red-600' : 'border-slate-200 text-slate-400 hover:border-red-300'
-                  }`}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all ${deleteQty === 1 ? 'border-red-400 bg-red-50 text-red-600' : 'border-slate-200 text-slate-400 hover:border-red-300'
+                    }`}
                 >1</button>
                 {deleteModal.item.soLuong > 2 && (
                   <button
                     onClick={() => setDeleteQty(Math.floor(deleteModal.item.soLuong / 2))}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                      deleteQty === Math.floor(deleteModal.item.soLuong / 2) ? 'border-red-400 bg-red-50 text-red-600' : 'border-slate-200 text-slate-400 hover:border-red-300'
-                    }`}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all ${deleteQty === Math.floor(deleteModal.item.soLuong / 2) ? 'border-red-400 bg-red-50 text-red-600' : 'border-slate-200 text-slate-400 hover:border-red-300'
+                      }`}
                   >{Math.floor(deleteModal.item.soLuong / 2)}</button>
                 )}
                 <button
                   onClick={() => setDeleteQty(deleteModal.item.soLuong)}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                    deleteQty === deleteModal.item.soLuong ? 'border-red-400 bg-red-50 text-red-600' : 'border-slate-200 text-slate-400 hover:border-red-300'
-                  }`}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all ${deleteQty === deleteModal.item.soLuong ? 'border-red-400 bg-red-50 text-red-600' : 'border-slate-200 text-slate-400 hover:border-red-300'
+                    }`}
                 >Tất cả ({deleteModal.item.soLuong})</button>
               </div>
               {deleteQty >= deleteModal.item.soLuong && (
@@ -939,12 +1060,15 @@ export default function BanHangTaiQuayPage() {
                     const printWindow = window.open('', '', 'height=900,width=1000');
                     if (!printWindow) { toast.error('Vui lòng cho phép popup để in hóa đơn'); return; }
                     printWindow.document.write('<html><head><title>Hóa đơn ' + completedOrder.maDonHang + '</title>');
-                    printWindow.document.write('<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;padding:0}*{print-color-adjust:exact;-webkit-print-color-adjust:exact}@page{size:A4;margin:10mm}</style>');
+                    printWindow.document.write(getPrintStyles());
                     printWindow.document.write('</head><body>');
                     printWindow.document.write(printArea.innerHTML);
                     printWindow.document.write('</body></html>');
                     printWindow.document.close();
                     printWindow.print();
+                    setTimeout(() => {
+                      printWindow.close();
+                    }, 2000);
                   }}
                   className="group relative px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-bold text-sm transition-all shadow-lg shadow-indigo-200 hover:shadow-indigo-300 flex items-center gap-2.5"
                 >

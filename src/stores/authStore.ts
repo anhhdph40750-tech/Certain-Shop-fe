@@ -9,6 +9,7 @@ interface AuthState {
   logout: () => void;
   isLoggedIn: () => boolean;
   isAdmin: () => boolean;
+  isSuperAdmin: () => boolean;
   isNhanVien: () => boolean;
 }
 
@@ -40,12 +41,17 @@ export const useAuthStore = create<AuthState>()(
 
       isAdmin: () => {
         const role = get().user?.vaiTro;
-        return role === 'ADMIN';
+        return role === 'ADMIN' || role === 'SUPER_ADMIN';
+      },
+
+      isSuperAdmin: () => {
+        const role = get().user?.vaiTro;
+        return role === 'SUPER_ADMIN';
       },
 
       isNhanVien: () => {
         const role = get().user?.vaiTro;
-        return role === 'ADMIN' || role === 'NHAN_VIEN';
+        return role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'NHAN_VIEN';
       },
     }),
     {

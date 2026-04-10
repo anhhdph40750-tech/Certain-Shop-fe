@@ -1,13 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, ChevronDown, ChevronUp, Eye, X } from 'lucide-react';
+import { Search, Eye, X } from 'lucide-react';
 import { adminApi } from '../../services/api';
 import { useAuthStore } from '../../stores/authStore';
 import type { DonHang } from '../../services/api';
 import { formatCurrency, formatDate, trangThaiDonHangLabel, getImageUrl, handleImgError } from '../../utils/format';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import QRCode from "react-qr-code";
-import { Html5Qrcode } from "html5-qrcode";
 import InvoicePrint from "../../components/InvoicePrint";
 const TRANG_THAI_OPTIONS = [
   { value: '', label: 'Tất cả' },
@@ -53,7 +51,6 @@ export default function QuanLyDonHangPage() {
   const [sort, setSort] = useState<'asc' | 'desc'>('desc');
   const [tongTrang, setTongTrang] = useState(0);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [chiTietDonHang, setChiTietDonHang] = useState<DonHang | null>(null);
   const [modalDonHang, setModalDonHang] = useState<DonHang | null>(null);
   const [xacNhanHuy, setXacNhanHuy] = useState<DonHang | null>(null);
   const [xacNhanHoan, setXacNhanHoan] = useState<DonHang | null>(null);
@@ -66,39 +63,6 @@ export default function QuanLyDonHangPage() {
   });
 
   const { isAdmin, isNhanVien } = useAuthStore();
-  const startScan = () => {
-    const scanner = new Html5Qrcode("reader");
-
-    scanner.start(
-      { facingMode: "environment" },
-      {
-        fps: 10,
-        qrbox: 250
-      },
-      (decodedText) => {
-
-        // khi quét được QR
-        setScanModal((prev) => ({
-          ...prev,
-          input: decodedText
-        }));
-
-        scanner.stop();
-      },
-      (error) => {
-        console.log(error);
-      }
-    );
-  };
-  const [scanModal, setScanModal] = useState<{
-    show: boolean;
-    maDonHang: string;
-    input: string;
-  }>({
-    show: false,
-    maDonHang: "",
-    input: ""
-  });
 
   const [confirmThanhToan, setConfirmThanhToan] = useState<{
   show: boolean;
@@ -130,21 +94,6 @@ export default function QuanLyDonHangPage() {
   }, [trangThai, tuKhoa, trang, sort]);
 
   useEffect(() => { load(); }, [load]);
-
-  const toggleExpand = async (maDonHang: string) => {
-    if (expanded === maDonHang) {
-      setExpanded(null);
-      setChiTietDonHang(null);
-      return;
-    }
-    try {
-      const r = await adminApi.chiTietDonHang(maDonHang);
-      setChiTietDonHang(r.data.duLieu);
-      setExpanded(maDonHang);
-    } catch {
-      toast.error('Không thể tải chi tiết');
-    }
-  };
 
   const xemChiTiet = async (maDonHang: string) => {
     try {
@@ -203,7 +152,6 @@ export default function QuanLyDonHangPage() {
       load();
       if (expanded === maDonHang) {
         setExpanded(null);
-        setChiTietDonHang(null);
       }
     } catch (error: any) {
       const errorMessage = error?.response?.data?.thongBao || 'Cập nhật thất bại';

@@ -4,6 +4,7 @@ import { thuocTinhApi } from '../../services/api';
 import type { MauSac, KichThuoc, ChatLieu, DanhMuc, ThuongHieu } from '../../services/api';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import { useAuthStore } from '../../stores/authStore';
 
 type TabKey = 'mau-sac' | 'kich-thuoc' | 'chat-lieu' | 'danh-muc' | 'thuong-hieu';
 
@@ -16,7 +17,9 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
 ];
 
 export default function QuanLyThuocTinhPage() {
+  const { isAdmin, isSuperAdmin } = useAuthStore();
   const [tab, setTab] = useState<TabKey>('mau-sac');
+  const canEdit = isAdmin() || isSuperAdmin();
 
   return (
     <div>
@@ -32,17 +35,17 @@ export default function QuanLyThuocTinhPage() {
         ))}
       </div>
 
-      {tab === 'mau-sac' && <MauSacTab />}
-      {tab === 'kich-thuoc' && <KichThuocTab />}
-      {tab === 'chat-lieu' && <ChatLieuTab />}
-      {tab === 'danh-muc' && <DanhMucTab />}
-      {tab === 'thuong-hieu' && <ThuongHieuTab />}
+      {tab === 'mau-sac' && <MauSacTab canEdit={canEdit} />}
+      {tab === 'kich-thuoc' && <KichThuocTab canEdit={canEdit} />}
+      {tab === 'chat-lieu' && <ChatLieuTab canEdit={canEdit} />}
+      {tab === 'danh-muc' && <DanhMucTab canEdit={canEdit} />}
+      {tab === 'thuong-hieu' && <ThuongHieuTab canEdit={canEdit} />}
     </div>
   );
 }
 
 // ======================== MÀU SẮC ========================
-function MauSacTab() {
+function MauSacTab({ canEdit }: { canEdit: boolean }) {
   const [list, setList] = useState<MauSac[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -86,10 +89,12 @@ function MauSacTab() {
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
-        <button onClick={openAdd} className="btn-primary flex items-center gap-2 text-sm"><Plus className="w-4 h-4" /> Thêm màu</button>
-      </div>
-      {showForm && (
+      {canEdit && (
+        <div className="flex justify-end mb-4">
+          <button onClick={openAdd} className="btn-primary flex items-center gap-2 text-sm"><Plus className="w-4 h-4" /> Thêm màu</button>
+        </div>
+      )}
+      {canEdit && showForm && (
         <div className="bg-white rounded-xl border border-gray-100 p-5 mb-5">
           <h4 className="font-semibold text-gray-800 mb-3">{editing ? 'Sửa màu sắc' : 'Thêm màu sắc'}</h4>
           <div className="grid grid-cols-3 gap-4">
@@ -139,10 +144,12 @@ function MauSacTab() {
                 <td className="px-4 py-3 font-medium text-gray-900">{ms.tenMau}</td>
                 <td className="px-4 py-3 text-gray-500">{ms.moTa || '—'}</td>
                 <td className="px-4 py-3">
-                  <div className="flex gap-1">
-                    <button onClick={() => openEdit(ms)} className="p-1.5 text-gray-400 hover:text-blue-600"><Edit2 className="w-4 h-4" /></button>
-                    <button onClick={() => xoa(ms.id)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
-                  </div>
+                  {canEdit && (
+                    <div className="flex gap-1">
+                      <button onClick={() => openEdit(ms)} className="p-1.5 text-gray-400 hover:text-blue-600"><Edit2 className="w-4 h-4" /></button>
+                      <button onClick={() => xoa(ms.id)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
@@ -155,7 +162,7 @@ function MauSacTab() {
 }
 
 // ======================== KÍCH THƯỚC ========================
-function KichThuocTab() {
+function KichThuocTab({ canEdit }: { canEdit: boolean }) {
   const [list, setList] = useState<KichThuoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -200,10 +207,12 @@ function KichThuocTab() {
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
-        <button onClick={openAdd} className="btn-primary flex items-center gap-2 text-sm"><Plus className="w-4 h-4" /> Thêm kích thước</button>
-      </div>
-      {showForm && (
+      {canEdit && (
+        <div className="flex justify-end mb-4">
+          <button onClick={openAdd} className="btn-primary flex items-center gap-2 text-sm"><Plus className="w-4 h-4" /> Thêm kích thước</button>
+        </div>
+      )}
+      {canEdit && showForm && (
         <div className="bg-white rounded-xl border border-gray-100 p-5 mb-5">
           <h4 className="font-semibold text-gray-800 mb-3">{editing ? 'Sửa kích thước' : 'Thêm kích thước'}</h4>
           <div className="grid grid-cols-2 gap-4">
@@ -239,10 +248,12 @@ function KichThuocTab() {
                 <td className="px-4 py-3 font-medium text-gray-900">{kt.kichCo}</td>
                 <td className="px-4 py-3 text-gray-500">{kt.thuTu ?? '—'}</td>
                 <td className="px-4 py-3">
-                  <div className="flex gap-1">
-                    <button onClick={() => openEdit(kt)} className="p-1.5 text-gray-400 hover:text-blue-600"><Edit2 className="w-4 h-4" /></button>
-                    <button onClick={() => xoa(kt.id)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
-                  </div>
+                  {canEdit && (
+                    <div className="flex gap-1">
+                      <button onClick={() => openEdit(kt)} className="p-1.5 text-gray-400 hover:text-blue-600"><Edit2 className="w-4 h-4" /></button>
+                      <button onClick={() => xoa(kt.id)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
@@ -255,7 +266,7 @@ function KichThuocTab() {
 }
 
 // ======================== CHẤT LIỆU ========================
-function ChatLieuTab() {
+function ChatLieuTab({ canEdit }: { canEdit: boolean }) {
   const [list, setList] = useState<ChatLieu[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -299,10 +310,12 @@ function ChatLieuTab() {
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
-        <button onClick={openAdd} className="btn-primary flex items-center gap-2 text-sm"><Plus className="w-4 h-4" /> Thêm chất liệu</button>
-      </div>
-      {showForm && (
+      {canEdit && (
+        <div className="flex justify-end mb-4">
+          <button onClick={openAdd} className="btn-primary flex items-center gap-2 text-sm"><Plus className="w-4 h-4" /> Thêm chất liệu</button>
+        </div>
+      )}
+      {canEdit && showForm && (
         <div className="bg-white rounded-xl border border-gray-100 p-5 mb-5">
           <h4 className="font-semibold text-gray-800 mb-3">{editing ? 'Sửa chất liệu' : 'Thêm chất liệu'}</h4>
           <div className="grid grid-cols-2 gap-4">
@@ -338,10 +351,12 @@ function ChatLieuTab() {
                 <td className="px-4 py-3 font-medium text-gray-900">{cl.tenChatLieu}</td>
                 <td className="px-4 py-3 text-gray-500">{cl.moTa || '—'}</td>
                 <td className="px-4 py-3">
-                  <div className="flex gap-1">
-                    <button onClick={() => openEdit(cl)} className="p-1.5 text-gray-400 hover:text-blue-600"><Edit2 className="w-4 h-4" /></button>
-                    <button onClick={() => xoa(cl.id)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
-                  </div>
+                  {canEdit && (
+                    <div className="flex gap-1">
+                      <button onClick={() => openEdit(cl)} className="p-1.5 text-gray-400 hover:text-blue-600"><Edit2 className="w-4 h-4" /></button>
+                      <button onClick={() => xoa(cl.id)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
@@ -354,7 +369,7 @@ function ChatLieuTab() {
 }
 
 // ======================== DANH MỤC ========================
-function DanhMucTab() {
+function DanhMucTab({ canEdit }: { canEdit: boolean }) {
   const [list, setList] = useState<DanhMuc[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -406,10 +421,12 @@ function DanhMucTab() {
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
-        <button onClick={openAdd} className="btn-primary flex items-center gap-2 text-sm"><Plus className="w-4 h-4" /> Thêm danh mục</button>
-      </div>
-      {showForm && (
+      {canEdit && (
+        <div className="flex justify-end mb-4">
+          <button onClick={openAdd} className="btn-primary flex items-center gap-2 text-sm"><Plus className="w-4 h-4" /> Thêm danh mục</button>
+        </div>
+      )}
+      {canEdit && showForm && (
         <div className="bg-white rounded-xl border border-gray-100 p-5 mb-5">
           <h4 className="font-semibold text-gray-800 mb-3">{editing ? 'Sửa danh mục' : 'Thêm danh mục'}</h4>
           <div className="grid grid-cols-3 gap-4">
@@ -451,10 +468,12 @@ function DanhMucTab() {
                 <td className="px-4 py-3 text-gray-500 font-mono text-xs">/{dm.duongDan}</td>
                 <td className="px-4 py-3 text-gray-500">{dm.moTa || '—'}</td>
                 <td className="px-4 py-3">
-                  <div className="flex gap-1">
-                    <button onClick={() => openEdit(dm)} className="p-1.5 text-gray-400 hover:text-blue-600"><Edit2 className="w-4 h-4" /></button>
-                    <button onClick={() => xoa(dm.id)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
-                  </div>
+                  {canEdit && (
+                    <div className="flex gap-1">
+                      <button onClick={() => openEdit(dm)} className="p-1.5 text-gray-400 hover:text-blue-600"><Edit2 className="w-4 h-4" /></button>
+                      <button onClick={() => xoa(dm.id)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
@@ -467,7 +486,7 @@ function DanhMucTab() {
 }
 
 // ======================== THƯƠNG HIỆU ========================
-function ThuongHieuTab() {
+function ThuongHieuTab({ canEdit }: { canEdit: boolean }) {
   const [list, setList] = useState<ThuongHieu[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -511,10 +530,12 @@ function ThuongHieuTab() {
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
-        <button onClick={openAdd} className="btn-primary flex items-center gap-2 text-sm"><Plus className="w-4 h-4" /> Thêm thương hiệu</button>
-      </div>
-      {showForm && (
+      {canEdit && (
+        <div className="flex justify-end mb-4">
+          <button onClick={openAdd} className="btn-primary flex items-center gap-2 text-sm"><Plus className="w-4 h-4" /> Thêm thương hiệu</button>
+        </div>
+      )}
+      {canEdit && showForm && (
         <div className="bg-white rounded-xl border border-gray-100 p-5 mb-5">
           <h4 className="font-semibold text-gray-800 mb-3">{editing ? 'Sửa thương hiệu' : 'Thêm thương hiệu'}</h4>
           <div className="grid grid-cols-2 gap-4">
@@ -550,10 +571,12 @@ function ThuongHieuTab() {
                 <td className="px-4 py-3 font-medium text-gray-900">{th.tenThuongHieu}</td>
                 <td className="px-4 py-3 text-gray-500">{th.moTa || '—'}</td>
                 <td className="px-4 py-3">
-                  <div className="flex gap-1">
-                    <button onClick={() => openEdit(th)} className="p-1.5 text-gray-400 hover:text-blue-600"><Edit2 className="w-4 h-4" /></button>
-                    <button onClick={() => xoa(th.id)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
-                  </div>
+                  {canEdit && (
+                    <div className="flex gap-1">
+                      <button onClick={() => openEdit(th)} className="p-1.5 text-gray-400 hover:text-blue-600"><Edit2 className="w-4 h-4" /></button>
+                      <button onClick={() => xoa(th.id)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}

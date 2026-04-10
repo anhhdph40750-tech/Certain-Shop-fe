@@ -8,16 +8,12 @@ import { formatCurrency, formatDate, trangThaiDonHangLabel, getImageUrl, handleI
 import LoadingSpinner from '../components/LoadingSpinner';
 import InvoicePrint from '../components/InvoicePrint';
 
-const STEPS_COD = ['CHO_XAC_NHAN', 'DA_XAC_NHAN', 'DANG_XU_LY', 'DANG_GIAO', 'HOAN_TAT'];
-const STEPS_VNPAY = ['CHO_THANH_TOAN', 'DA_THANH_TOAN', 'DANG_XU_LY', 'DANG_GIAO', 'HOAN_TAT'];
-
 export default function ChiTietDonHangPage() {
   const { maDonHang } = useParams<{ maDonHang: string }>();
   
   const [donHang, setDonHang] = useState<DonHang | null>(null);
   const [loading, setLoading] = useState(true);
   const [huyLoading, setHuyLoading] = useState(false);
-  const [xacNhanLoading, setXacNhanLoading] = useState(false);
   const [showPrint, setShowPrint] = useState(false);
   const [showHuyConfirm, setShowHuyConfirm] = useState(false);
 
@@ -53,25 +49,10 @@ export default function ChiTietDonHangPage() {
     }
   };
 
-  const xacNhanNhanHang = async () => {
-    if (!donHang) return;
-    setXacNhanLoading(true);
-    try {
-      await donHangApi.xacNhanNhanHang(donHang.maDonHang);
-      toast.success('Đã xác nhận nhận hàng');
-      load();
-    } catch {
-      toast.error('Có lỗi xảy ra');
-    } finally {
-      setXacNhanLoading(false);
-    }
-  };
-
   if (loading) return <LoadingSpinner fullPage />;
   if (!donHang) return <div className="text-center py-20 text-gray-500">Không tìm thấy đơn hàng</div>;
 
   const tt = trangThaiDonHangLabel[donHang.trangThaiDonHang] || { label: donHang.trangThaiDonHang, color: 'gray' };
-  const steps = donHang.phuongThucThanhToan === 'VNPAY' ? STEPS_VNPAY : STEPS_COD;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">

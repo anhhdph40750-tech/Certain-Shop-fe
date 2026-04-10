@@ -28,6 +28,7 @@ import DashboardPage from './pages/admin/DashboardPage';
 import QuanLyDonHangPage from './pages/admin/QuanLyDonHangPage';
 import QuanLyNguoiDungPage from './pages/admin/QuanLyNguoiDungPage';
 import QuanLyKhachHangPage from './pages/admin/QuanLyKhachHangPage';
+import QuanLyUserAdminPage from './pages/admin/QuanLyUserAdminPage';
 import ThemNhanVienPage from './pages/admin/ThemNhanVienPage';
 import QuanLySanPhamPage from './pages/admin/QuanLySanPhamPage';
 import QuanLyThuocTinhPage from './pages/admin/QuanLyThuocTinhPage';
@@ -80,6 +81,7 @@ export default function App() {
             <Route path="san-pham" element={<QuanLySanPhamPage />} />
             <Route path="don-hang" element={<QuanLyDonHangPage />} />
             <Route path="nguoi-dung" element={<QuanLyNguoiDungPage />} />
+            <Route path="user-admin" element={<QuanLyUserAdminPage />} />
             <Route path="nguoi-dung/them-nhan-vien" element={<ThemNhanVienPage />} />
             <Route path="nguoi-dung/them-khach-hang" element={<ThemNhanVienPage />} />
             <Route path="nguoi-dung/sua/:id" element={<ThemNhanVienPage />} />

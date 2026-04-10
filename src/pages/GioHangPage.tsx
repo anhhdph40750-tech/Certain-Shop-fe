@@ -30,7 +30,8 @@ export default function GioHangPage() {
     try {
       const res = await gioHangApi.lay();
       setGioHang(res.data.duLieu);
-      setCount(res.data.duLieu?.danhSachChiTiet?.length || 0);
+      const totalQuantity = res.data.duLieu?.danhSachChiTiet?.reduce((sum, ct) => sum + ct.soLuong, 0) || 0;
+      setCount(totalQuantity);
     } catch {
       toast.error('Không thể tải giỏ hàng');
     } finally {
@@ -44,7 +45,8 @@ export default function GioHangPage() {
     try {
       const res = await gioHangApi.capNhat(chiTietId, soLuong);
       setGioHang(res.data.duLieu);
-      setCount(res.data.duLieu?.danhSachChiTiet?.length || 0);
+      const totalQuantity = res.data.duLieu?.danhSachChiTiet?.reduce((sum, ct) => sum + ct.soLuong, 0) || 0;
+      setCount(totalQuantity);
     } catch {
       toast.error('Có lỗi khi cập nhật');
     } finally {

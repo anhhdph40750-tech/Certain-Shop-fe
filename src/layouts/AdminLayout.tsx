@@ -18,11 +18,12 @@ const navItems = [
 export default function AdminLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [taiKhoanOpen, setTaiKhoanOpen] = useState(true);
-  const { user, logout } = useAuthStore();
+  const { user, logout, isSuperAdmin } = useAuthStore();
   const location = useLocation();
 
   const isTaiKhoanActive = location.pathname.startsWith('/quan-ly/nguoi-dung')
-    || location.pathname.startsWith('/quan-ly/khach-hang');
+    || location.pathname.startsWith('/quan-ly/khach-hang')
+    || location.pathname.startsWith('/quan-ly/user-admin');
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -89,6 +90,16 @@ export default function AdminLayout() {
                   Nhân viên
                 </NavLink>
                 <NavLink
+                  to="/quan-ly/user-admin"
+                  className={({ isActive }) =>
+                    `block px-3 py-2 rounded-lg text-sm transition-colors ${
+                      isActive ? 'text-white bg-orange-500' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                    }`
+                  }
+                >
+                  Quản lý admin
+                </NavLink>
+                <NavLink
                   to="/quan-ly/khach-hang"
                   className={({ isActive }) =>
                     `block px-3 py-2 rounded-lg text-sm transition-colors ${
@@ -118,13 +129,21 @@ export default function AdminLayout() {
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0">
           <h1 className="font-semibold text-gray-800">Quản lý</h1>
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
-              <span className="text-indigo-600 font-semibold text-sm">{user?.hoTen?.[0] || 'A'}</span>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+              isSuperAdmin() ? 'bg-red-100' : 'bg-indigo-100'
+            }`}>
+              <span className={`font-semibold text-sm ${
+                isSuperAdmin() ? 'text-red-600' : 'text-indigo-600'
+              }`}>
+                {user?.hoTen?.[0] || 'A'}
+              </span>
             </div>
             <div className="text-right">
               <p className="text-sm text-gray-700 font-medium">{user?.hoTen}</p>
-              <p className="text-xs text-gray-400">
-                {user?.vaiTro === 'ADMIN' ? 'Quản trị viên' : 'Nhân viên'}
+              <p className={`text-xs ${
+                isSuperAdmin() ? 'text-red-500 font-medium' : 'text-gray-400'
+              }`}>
+                {isSuperAdmin() ? 'Super Admin' : user?.vaiTro === 'ADMIN' ? 'Quản trị viên' : 'Nhân viên'}
               </p>
             </div>
           </div>
